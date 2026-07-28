@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/invoices/pdf",
+      "destination": "/api/invoices/pdf"
+    },
+    {
+      "source": "/api/admin/(.*)",
+      "destination": "/api/admin/$1"
+    },
+    {
+      "source": "/((?!api/|assets/|favicon.ico|admin-panel\\.html).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

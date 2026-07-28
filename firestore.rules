@@ -1,0 +1,189 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'harounjaballi@gmail.com';
+    }
+
+    // Vrai si `uid` est un compte admin dont le magasin lui appartient bien à lui-même
+    // (ownerId == uid, ou absent = équivalent). Sert à isoler strictement chaque magasin.
+    function isStoreAdmin(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid)) &&
+        get(/databases/$(database)/documents/users/$(uid)).data.role == 'admin' &&
+        get(/databases/$(database)/documents/users/$(uid)).data.get('ownerId', uid) == uid;
+    }
+
+    function hasAccess(ownerId) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        request.auth.uid == ownerId ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('ownerId', '') == ownerId)
+      );
+    }
+
+    match /users/{userId} {
+      // Création : uniquement son propre profil admin (auto-inscription)
+      allow create: if isAuthenticated() && request.auth.uid == userId &&
+        request.resource.data.uid == userId &&
+        request.resource.data.role == "admin" &&
+        request.resource.data.status == "active" &&
+        request.resource.data.ownerId == userId;
+
+      // Création d'un collaborateur : par le super-admin, ou par l'admin propriétaire
+      // du magasin cible uniquement (isolation stricte entre magasins). Autorise aussi
+      // l'auto-migration d'un admin (compte local -> vrai compte Firebase Auth), reconnue
+      // au fait que l'email du nouveau document correspond à celui du compte actuellement connecté.
+      allow create: if isAuthenticated() && request.auth.uid != userId && (
+        isAdmin() ||
+        (
+          isStoreAdmin(request.auth.uid) &&
+          (
+            (request.resource.data.role == 'user' && request.resource.data.ownerId == request.auth.uid) ||
+            (
+              request.resource.data.role == 'admin' &&
+              request.resource.data.ownerId == userId &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email == request.resource.data.email
+            )
+          )
+        )
+      );
+
+      // Lecture d'un document unique (get)
+      allow get: if isAuthenticated();
+
+      // Lecture liste : le super-admin peut tout lister ; les autres comptes authentifiés
+      // aussi (le filtrage par magasin est fait côté requête/application)
+      allow list: if isAuthenticated() || isAdmin();
+
+      // Modification par soi-même sans changer rôle/statut/ownerId
+      allow update: if isAuthenticated() && request.auth.uid == userId &&
+        request.resource.data.role == resource.data.get('role', 'user') &&
+        request.resource.data.status == resource.data.get('status', 'active') &&
+        request.resource.data.ownerId == resource.data.get('ownerId', userId);
+
+      // Modification totale réservée au super-admin de la plateforme
+      allow update: if isAdmin();
+
+      // Modification par un admin de son propre magasin uniquement, et uniquement
+      // sur ses propres collaborateurs (jamais sur un autre magasin) :
+      // - le document ciblé doit déjà appartenir à ce magasin (ownerId == requester)
+      // - le résultat de la modification doit rester un collaborateur (role: user)
+      //   rattaché au même magasin (ownerId inchangé)
+      allow update: if isAuthenticated() && request.auth.uid != userId &&
+        isStoreAdmin(request.auth.uid) &&
+        resource.data.get('ownerId', resource.id) == request.auth.uid &&
+        request.resource.data.role == 'user' &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      // Suppression : super-admin, admin supprimant son propre collaborateur,
+      // ou un admin supprimant son propre ancien profil (nettoyage après auto-migration)
+      allow delete: if isAdmin() || (
+        isAuthenticated() && request.auth.uid != userId &&
+        isStoreAdmin(request.auth.uid) &&
+        resource.data.get('ownerId', resource.id) == request.auth.uid
+      ) || (
+        isAuthenticated() && request.auth.uid == userId && isStoreAdmin(userId)
+      );
+    }
+
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
+    match /clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
+    match /sales/{saleId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
+    match /invoices/{invoiceId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
+    match /counters/{counterId} {
+      // Compteurs de séquence (factures, réparations...) : accès si le suffixe
+      // du compteur correspond à l'uid ou à l'ownerId du magasin de l'utilisateur.
+      allow read, write: if isAuthenticated() && (
+        isAdmin() ||
+        counterId == 'invoices_' + request.auth.uid ||
+        counterId == 'repairs_' + request.auth.uid ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         (counterId == 'invoices_' + get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('ownerId', '') ||
+          counterId == 'repairs_' + get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('ownerId', '')))
+      );
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if isAuthenticated() && (
+        isAdmin() ||
+        settingId == request.auth.uid ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('ownerId', '') == settingId)
+      );
+    }
+
+    match /notes/{noteId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
+    match /supplies/{supplyId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
+    match /repairs/{repairId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
+    match /audit_logs/{logId} {
+      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
+      allow update, delete: if false;
+    }
+
+    match /otp_codes/{uid} {
+      allow read, write: if false;
+    }
+  }
+}
