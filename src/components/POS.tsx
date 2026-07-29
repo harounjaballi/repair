@@ -1116,35 +1116,9 @@ export default function POS({ userProfile }: POSProps) {
             )}
           </div>
 
-          {/* Summary Cards Panel (Tableau récapitulatif in 4 columns row on desktop, 2x2 on mobile) */}
-          <div className="bg-slate-50/50 p-2 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {/* Card 1: Nombre d'articles */}
-            <div className="bg-white border border-slate-150 rounded-lg p-2 flex items-center justify-between shadow-3xs">
-              <div className="min-w-0">
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">Articles</span>
-                <span className="text-sm font-black text-slate-800 font-mono block leading-none mt-1">
-                  {cart.reduce((sum, item) => sum + item.quantity, 0)} <span className="text-[9px] font-bold text-slate-500 uppercase">pces</span>
-                </span>
-              </div>
-              <div className="w-6 h-6 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 ml-1">
-                <ShoppingCart className="w-3 h-3" />
-              </div>
-            </div>
-
-            {/* Card 2: Montant Brut */}
-            <div className="bg-white border border-slate-150 rounded-lg p-2 flex items-center justify-between shadow-3xs">
-              <div className="min-w-0">
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">Total Brut</span>
-                <span className="text-xs sm:text-sm font-black text-slate-700 font-mono block leading-none mt-1 truncate">
-                  {(subtotal + tvaAmount).toFixed(3)} <span className="text-[8px] font-bold text-slate-500">{currency}</span>
-                </span>
-              </div>
-              <div className="w-6 h-6 rounded bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-1">
-                <Coins className="w-3 h-3" />
-              </div>
-            </div>
-
-            {/* Card 3: Remise Appliquée avec champ d'écriture directe (Sleek) */}
+          {/* Summary Cards Panel — seule la Remise est conservée */}
+          <div className="bg-slate-50/50 p-2 border-t border-slate-100 grid grid-cols-1 gap-2">
+            {/* Remise Appliquée avec champ d'écriture directe (Sleek) */}
             <div className="bg-amber-50/60 border border-amber-200/80 rounded-lg p-2 flex flex-col justify-between shadow-3xs">
               <div className="flex items-center justify-between">
                 <span className="text-[8px] font-black text-amber-800 uppercase tracking-wider">Remise (DT)</span>
@@ -1178,65 +1152,28 @@ export default function POS({ userProfile }: POSProps) {
                   className="w-full bg-transparent px-1 text-[10px] font-black font-mono text-amber-950 focus:outline-none text-right"
                 />
               </div>
-              {/* Presets remise super compacts */}
-              <div className="flex gap-1 mt-1 justify-end">
-                <button 
-                  type="button"
-                  onClick={() => { setDiscount(0); setDiscountInput('0'); }}
-                  className="text-[7px] font-bold bg-white hover:bg-amber-100 text-amber-850 px-1 py-0.5 rounded border border-amber-250 cursor-pointer"
-                >
-                  Clear
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => { setDiscount(5); setDiscountInput('5.000'); }}
-                  className="text-[7px] font-black bg-amber-600 text-white hover:bg-amber-700 px-1 py-0.5 rounded cursor-pointer"
-                >
-                  -5DT
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => { setDiscount(10); setDiscountInput('10.000'); }}
-                  className="text-[7px] font-black bg-amber-600 text-white hover:bg-amber-700 px-1 py-0.5 rounded cursor-pointer"
-                >
-                  -10DT
-                </button>
-              </div>
-            </div>
-
-            {/* Card 4: Bénéfice Estimé */}
-            <div className="bg-emerald-50/50 border border-emerald-200/60 rounded-lg p-2 flex items-center justify-between shadow-3xs">
-              <div className="min-w-0">
-                <span className="text-[8px] font-black text-emerald-800 uppercase tracking-wider block">Bénéfice estimé</span>
-                <span className="text-xs sm:text-sm font-black text-emerald-700 font-mono block leading-none mt-1 truncate">
-                  {estimatedBenefit.toFixed(3)} <span className="text-[8px] font-bold text-emerald-650">{currency}</span>
-                </span>
-              </div>
-              <div className="w-6 h-6 rounded bg-emerald-100 text-emerald-650 flex items-center justify-center shrink-0 ml-1">
-                <TrendingUp className="w-3 h-3" />
-              </div>
             </div>
           </div>
 
           {/* Bottom Checkout Zone (Always Visible & Split for Wide Screens) */}
-          <div className="bg-white border-t border-slate-200 p-3.5 space-y-3 rounded-b-2xl">
+          <div className="bg-white/40 border-t border-slate-200 p-3.5 space-y-3 rounded-b-2xl">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
               
               {/* Left Column: Total Net & Real-time Change Calculator */}
-              <div className="md:col-span-6 flex flex-col justify-between gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div className="md:col-span-6 flex flex-col justify-between gap-2.5 bg-white/40 p-3 rounded-xl border border-slate-200">
                 {/* GIANT DOCK FOR NET TOTAL */}
                 <div className="flex flex-col gap-1 text-center animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between text-emerald-700 font-black text-[9px] uppercase tracking-widest pb-1 border-b border-slate-200">
+                  <div className="flex items-center justify-between text-blue-700 font-black text-[9px] uppercase tracking-widest pb-1 border-b border-slate-200">
                     <span>Total Net à payer</span>
-                    <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200 text-[8px]">
+                    <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 text-[8px]">
                       {storeSettings?.tvaEnabled !== false ? `TVA (${storeSettings?.tva || 19}%)` : 'Hors taxe'}
                     </span>
                   </div>
                   <div className="flex justify-center items-center gap-1 mt-1.5">
-                    <span className="text-3xl sm:text-4xl font-black font-mono tracking-tighter text-emerald-700 leading-none drop-shadow-sm select-all">
+                    <span className="text-3xl sm:text-4xl font-black font-mono tracking-tighter text-blue-700 leading-none drop-shadow-sm select-all">
                       {cartTotal.toFixed(3)}
                     </span>
-                    <span className="text-sm font-black text-emerald-600 uppercase tracking-wider ml-1">
+                    <span className="text-sm font-black text-blue-600 uppercase tracking-wider ml-1">
                       {currency}
                     </span>
                   </div>
@@ -1247,10 +1184,10 @@ export default function POS({ userProfile }: POSProps) {
                   <div className={cn(
                     "p-2 rounded-lg border flex items-center justify-between text-xs font-bold leading-none shadow-sm transition-all duration-200 mt-1",
                     receivedCash > cartTotal
-                      ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                      ? "bg-blue-50 border-blue-200 text-blue-700"
                       : receivedCash < cartTotal
                         ? "bg-rose-50 border-rose-200 text-rose-700"
-                        : "bg-emerald-50 border-emerald-200 text-emerald-600"
+                        : "bg-blue-50 border-blue-200 text-blue-600"
                   )}>
                     <div className="flex items-center gap-1 opacity-90">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -1276,8 +1213,8 @@ export default function POS({ userProfile }: POSProps) {
               {/* Right Column: Cash Received Input & Big Validation Button */}
               <div className="md:col-span-6 flex flex-col justify-between gap-2">
                 {/* HIGH CONTRAST RECEIVED AMOUNT INPUT */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 flex flex-col gap-1 shadow-inner">
-                  <div className="flex justify-between items-center text-[9px] font-black text-emerald-700 uppercase tracking-wider">
+                <div className="bg-white/40 border border-slate-200 rounded-xl p-2 flex flex-col gap-1 shadow-inner">
+                  <div className="flex justify-between items-center text-[9px] font-black text-blue-700 uppercase tracking-wider">
                     <span>Montant Reçu</span>
                     <button 
                       type="button"
@@ -1291,7 +1228,7 @@ export default function POS({ userProfile }: POSProps) {
                     </button>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-300 pb-0.5">
-                    <CreditCard className="w-4 h-4 text-emerald-500 mr-1.5 shrink-0" />
+                    <CreditCard className="w-4 h-4 text-blue-500 mr-1.5 shrink-0" />
                     <input
                       type="text"
                       inputMode="decimal"
@@ -1327,28 +1264,9 @@ export default function POS({ userProfile }: POSProps) {
                         }
                       }}
                       placeholder="0.000"
-                      className="w-full bg-transparent text-right text-lg font-black font-mono text-emerald-700 focus:outline-none focus:ring-0 p-0 select-all"
+                      className="w-full bg-transparent text-right text-lg font-black font-mono text-blue-700 focus:outline-none focus:ring-0 p-0 select-all"
                     />
-                    <span className="text-xs font-black text-emerald-500 ml-1 shrink-0">{currency}</span>
-                  </div>
-                  {/* Presets de paiement rapide */}
-                  <div className="flex gap-1 overflow-x-auto no-scrollbar justify-end">
-                    {[5, 10, 20, 50].map((val) => (
-                      <button 
-                        key={val}
-                        type="button"
-                        onClick={() => {
-                          setReceivedCash(prev => {
-                            const updated = prev + val;
-                            setReceivedCashInput(updated.toFixed(3));
-                            return updated;
-                          });
-                        }}
-                        className="text-[8px] font-black bg-slate-200 hover:bg-slate-300 text-slate-700 px-1.5 py-0.5 rounded cursor-pointer"
-                      >
-                        +{val} DT
-                      </button>
-                    ))}
+                    <span className="text-xs font-black text-blue-500 ml-1 shrink-0">{currency}</span>
                   </div>
                 </div>
 
