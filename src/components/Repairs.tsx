@@ -15,7 +15,7 @@ import {
   AlertCircle, Trash2, Package, Shield, FileText, Edit3, Phone,
   Calendar, ChevronRight, History, DollarSign, Filter
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, isSparePart } from '../lib/utils';
 import { format } from 'date-fns';
 import { RepairTicket } from './RepairTicket';
 
@@ -372,7 +372,7 @@ function RepairForm({
   ).slice(0, 6);
 
   const partProducts = products.filter(p =>
-    partSearch && (
+    isSparePart(p) && partSearch && (
       p.name.toLowerCase().includes(partSearch.toLowerCase()) ||
       (p.reference || '').toLowerCase().includes(partSearch.toLowerCase()) ||
       (p.barcode || '').includes(partSearch)
