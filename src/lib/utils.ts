@@ -104,8 +104,18 @@ export function decodeAzertyBarcode(str: string): string {
  * heuristique : la présence d'une référence ou de modèles compatibles indique
  * une pièce détachée.
  */
-export function isSparePart(p: { isPart?: boolean; reference?: string; compatibleModels?: string } | null | undefined): boolean {
+export function isSparePart(p: { isPart?: boolean; isService?: boolean; reference?: string; compatibleModels?: string } | null | undefined): boolean {
   if (!p) return false;
+  if (p.isService === true) return false;
   if (typeof p.isPart === 'boolean') return p.isPart;
   return Boolean((p.reference && p.reference.trim()) || (p.compatibleModels && p.compatibleModels.trim()));
+}
+
+/**
+ * Détermine si un article est un SERVICE (main-d'œuvre, diagnostic, pose…).
+ * Un service se vend en caisse comme un produit mais n'a ni prix d'achat ni
+ * stock : sa quantité vendable est illimitée et il n'est jamais en rupture.
+ */
+export function isService(p: { isService?: boolean } | null | undefined): boolean {
+  return Boolean(p && p.isService === true);
 }
