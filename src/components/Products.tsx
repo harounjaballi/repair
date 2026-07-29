@@ -4,14 +4,17 @@ import { db } from '../firebase';
 import { Product, Category, StoreSettings, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
 import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp } from 'lucide-react';
-import { cn, decodeAzertyBarcode } from '../lib/utils';
+import { cn, decodeAzertyBarcode, isSparePart } from '../lib/utils';
 
 interface ProductsProps {
   userProfile: UserProfile | null;
+  // 'part' = pièces détachées (atelier), 'product' = produits vendables (caisse)
+  mode?: 'part' | 'product';
 }
 
-export default function Products({ userProfile }: ProductsProps) {
+export default function Products({ userProfile, mode = 'product' }: ProductsProps) {
   const ownerId = userProfile?.ownerId || userProfile?.uid || 'no_user_auth';
+  const isPartMode = mode === 'part';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
@@ -292,6 +295,7 @@ export default function Products({ userProfile }: ProductsProps) {
 
         await updateDoc(doc(db, 'products', editingProduct.id), {
           ...formData,
+          isPart: isPartMode,
           ownerId,
           userId: userProfile?.uid || ownerId
         });
@@ -315,6 +319,7 @@ export default function Products({ userProfile }: ProductsProps) {
       } else {
         const docRef = await addDoc(collection(db, 'products'), {
           ...formData,
+          isPart: isPartMode,
           createdAt: new Date().toISOString(),
           ownerId,
           userId: userProfile?.uid || ownerId
@@ -729,21 +734,22 @@ export default function Products({ userProfile }: ProductsProps) {
   }, [categories, products]);
 
   const filteredProducts = products.filter(p => {
+    const matchesMode = isSparePart(p) === isPartMode;
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.barcode && p.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory =
       selectedCategory === 'all' || normalizeCat(p.category) === normalizeCat(selectedCategory);
-    return matchesSearch && matchesCategory;
+    return matchesMode && matchesSearch && matchesCategory;
   });
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Produits</h1>
-          <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-0.5">Gérez votre inventaire de produits et articles de supérette</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{isPartMode ? 'Pièces détachées' : 'Produits'}</h1>
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-0.5">{isPartMode ? 'Pièces utilisées pour les réparations (atelier)' : 'Produits vendables en caisse'}</p>
         </div>
         <div className="flex gap-2.5">
           <button
@@ -751,7 +757,7 @@ export default function Products({ userProfile }: ProductsProps) {
             className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 shadow-lg shadow-indigo-600/15 group hover:-translate-y-0.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 transition-transform group-hover:rotate-90 duration-300" />
-            Nouveau Produit
+            {isPartMode ? 'Nouvelle Pièce' : 'Nouveau Produit'}
           </button>
         </div>
       </div>
@@ -766,7 +772,7 @@ export default function Products({ userProfile }: ProductsProps) {
                 type="text"
                 name="product-search"
                 autoComplete="off"
-                placeholder="Rechercher un produit..."
+                placeholder={isPartMode ? 'Rechercher une pièce...' : 'Rechercher un produit...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white text-xs font-semibold text-slate-700 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all duration-300"
