@@ -21,6 +21,7 @@ export interface Product {
   barcode?: string;
   stock: number;
   isPart?: boolean;            // true = pièce détachée, false = produit/accessoire
+  isService?: boolean;         // true = service (main-d'œuvre) : pas de prix d'achat ni de stock
   lowStockAlert?: number;
   ownerId?: string;
   createdAt?: string;
