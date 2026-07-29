@@ -433,13 +433,25 @@ function RepairForm({
 
       const newLog: RepairLog = {
         date: now,
-        status: statusChanged ? status : undefined,
         note: isEdit
           ? (statusChanged ? `Statut → ${REPAIR_STATUS_LABELS[status]}` : 'Modification de la fiche')
           : 'Réparation créée',
         by: currentUserLabel,
       };
-      const logs = [...(repair?.logs || []), newLog];
+      // On n'ajoute le champ status au log que s'il a changé (Firestore refuse undefined).
+      if (statusChanged) {
+        newLog.status = status;
+      }
+      // Nettoyage défensif : purge toute valeur undefined des anciens logs
+      // (des fiches créées avant ce correctif pouvaient contenir status: undefined,
+      // ce que Firestore refuse lors de l'update).
+      const cleanLogs = [...(repair?.logs || []), newLog].map(l => {
+        const clean: RepairLog = { date: l.date, note: l.note };
+        if (l.status !== undefined) clean.status = l.status;
+        if (l.by !== undefined) clean.by = l.by;
+        return clean;
+      });
+      const logs = cleanLogs;
 
       const payload: any = {
         clientId: clientId || '',
