@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { Product, Category, StoreSettings, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
 import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp } from 'lucide-react';
-import { cn, decodeAzertyBarcode, isSparePart } from '../lib/utils';
+import { cn, decodeAzertyBarcode, isSparePart, isService } from '../lib/utils';
 
 interface ProductsProps {
   userProfile: UserProfile | null;
@@ -163,6 +163,9 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
 
   const [buyPriceInput, setBuyPriceInput] = useState('');
   const [sellPriceInput, setSellPriceInput] = useState('');
+  // Case « C'est un service » : masque prix d'achat / stock / alerte et
+  // n'enregistre ni dépense ni mouvement de stock.
+  const [isServiceForm, setIsServiceForm] = useState(false);
 
   useEffect(() => {
     const unsubscribeProds = onSnapshot(query(collection(db, 'products'), where('ownerId', '==', ownerId)), (snapshot) => {
@@ -234,9 +237,18 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     // Empêche un second envoi tant que le premier n'est pas terminé (évite les doublons)
     if (isSubmitting) return;
 
+    // Un service n'a ni prix d'achat ni stock : on force ces valeurs à 0 pour
+    // qu'aucune dépense ni mouvement de stock ne soit généré.
+    if (isServiceForm) {
+      formData.buyPrice = 0;
+      formData.stock = 0;
+      formData.lowStockAlert = 0;
+    }
+
     // Garde-fou : le prix de vente doit être supérieur ou égal au prix d'achat,
     // sinon chaque vente de ce produit génère un bénéfice négatif.
-    if ((formData.sellPrice || 0) < (formData.buyPrice || 0)) {
+    // (Ne s'applique pas aux services, dont le prix d'achat est toujours 0.)
+    if (!isServiceForm && (formData.sellPrice || 0) < (formData.buyPrice || 0)) {
       setErrorMsg(
         `Le prix de vente (${(formData.sellPrice || 0).toFixed(3)}) doit être supérieur ou égal au prix d'achat (${(formData.buyPrice || 0).toFixed(3)}). Vendre en dessous du prix d'achat génère une perte sur chaque vente.`
       );
@@ -295,7 +307,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
 
         await updateDoc(doc(db, 'products', editingProduct.id), {
           ...formData,
-          isPart: isPartMode,
+          isPart: isServiceForm ? false : isPartMode,
+          isService: isServiceForm,
           ownerId,
           userId: userProfile?.uid || ownerId
         });
@@ -319,7 +332,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       } else {
         const docRef = await addDoc(collection(db, 'products'), {
           ...formData,
-          isPart: isPartMode,
+          isPart: isServiceForm ? false : isPartMode,
+          isService: isServiceForm,
           createdAt: new Date().toISOString(),
           ownerId,
           userId: userProfile?.uid || ownerId
@@ -589,6 +603,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       });
       setBuyPriceInput(product.buyPrice.toFixed(3));
       setSellPriceInput(product.sellPrice.toFixed(3));
+      setIsServiceForm(product.isService === true);
     } else {
       setEditingProduct(null);
       setFormData({
@@ -604,6 +619,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       });
       setBuyPriceInput('');
       setSellPriceInput('');
+      setIsServiceForm(false);
     }
     setIsModalOpen(true);
   };
@@ -870,9 +886,12 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         {product.category}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 font-mono">{product.buyPrice.toFixed(3)} {storeSettings?.currency || 'DT'}</td>
+                    <td className="px-6 py-4 text-gray-600 font-mono">{isService(product) ? '—' : `${product.buyPrice.toFixed(3)} ${storeSettings?.currency || 'DT'}`}</td>
                     <td className="px-6 py-4 text-gray-900 font-bold font-mono">{product.sellPrice.toFixed(3)} {storeSettings?.currency || 'DT'}</td>
                     <td className="px-6 py-4">
+                      {isService(product) ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-150">Service</span>
+                      ) : (
                       <div className="flex items-center gap-2">
                         <span className={cn(
                           "font-medium",
@@ -884,9 +903,11 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                           <AlertTriangle className="w-4 h-4 text-red-500" />
                         )}
                       </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {!isService(product) && (
                         <button
                           onClick={() => {
                             setReplenishProduct(product);
@@ -899,7 +920,9 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                           <Plus className="w-3.5 h-3.5" />
                           <span>+ Stock</span>
                         </button>
+                        )}
 
+                        {!isService(product) && (
                         <button
                           onClick={() => openHistory(product)}
                           className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-transparent"
@@ -907,6 +930,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         >
                           <History className="w-4 h-4" />
                         </button>
+                        )}
 
                         <button
                           onClick={() => requestSecureAction('edit', product)}
@@ -1044,6 +1068,23 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                     </div>
                   </div>
 
+                  {!isPartMode && (
+                    <div className="col-span-2">
+                      <label className="flex items-center gap-2.5 px-4 py-2.5 border border-gray-200 rounded-xl bg-emerald-50/40 cursor-pointer hover:bg-emerald-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isServiceForm}
+                          onChange={(e) => setIsServiceForm(e.target.checked)}
+                          className="w-4 h-4 accent-emerald-600"
+                        />
+                        <span className="text-sm font-medium text-slate-700">
+                          C'est un service (main-d'œuvre) — sans prix d'achat ni stock
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  {!isServiceForm && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Stock Initial</label>
                     <input
@@ -1055,7 +1096,9 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                     />
                   </div>
+                  )}
 
+                  {!isServiceForm && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Alerte Stock Faible</label>
                     <input
@@ -1066,7 +1109,9 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                     />
                   </div>
+                  )}
 
+                  {!isServiceForm && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Prix Achat ({storeSettings?.currency || 'DT'})</label>
                     <input
@@ -1092,8 +1137,9 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                     />
                   </div>
+                  )}
 
-                  <div>
+                  <div className={isServiceForm ? 'col-span-2' : ''}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Prix Vente ({storeSettings?.currency || 'DT'})</label>
                     <input
                       type="text"
@@ -1119,6 +1165,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                     />
                   </div>
 
+                  {!isServiceForm && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Référence pièce</label>
                     <input
@@ -1129,6 +1176,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none box-border"
                     />
                   </div>
+                  )}
+                  {!isServiceForm && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Modèles compatibles</label>
                     <input
@@ -1139,6 +1188,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none box-border"
                     />
                   </div>
+                  )}
                 </div>
               </div>
 
