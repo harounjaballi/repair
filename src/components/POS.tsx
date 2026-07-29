@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { Product, Client, SaleItem, Sale, Invoice, Category, StoreSettings, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
 import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, CheckCircle, AlertCircle, Printer, X, FileText, Barcode, Filter, Tag, Coins, Percent, TrendingUp, UserCheck, Flame } from 'lucide-react';
-import { cn, decodeAzertyBarcode } from '../lib/utils';
+import { cn, decodeAzertyBarcode, isSparePart } from '../lib/utils';
 import { format } from 'date-fns';
 import { PrintableTicket } from './PrintableTicket';
 
@@ -64,7 +64,10 @@ export default function POS({ userProfile }: POSProps) {
 
   useEffect(() => {
     const unsubscribeProds = onSnapshot(query(collection(db, 'products'), where('ownerId', '==', ownerId)), (snapshot) => {
-      const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      const prods = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Product))
+        // La caisse ne vend que les produits : les pièces détachées (atelier) sont exclues.
+        .filter(p => !isSparePart(p));
       prods.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setProducts(prods);
     }, (err) => {
