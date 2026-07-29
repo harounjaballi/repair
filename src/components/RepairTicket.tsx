@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Repair, StoreSettings, REPAIR_STATUS_LABELS } from '../types';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import { Barcode } from './Barcode';
 
 interface Props {
   repair: Repair;
@@ -47,6 +48,11 @@ export const RepairTicket = forwardRef<HTMLDivElement, Props>(({ repair, ownerId
       <div className="text-center font-bold text-[13px]">BON DE DÉPÔT / RÉPARATION</div>
       {line}
       <div className="flex justify-between"><span>N°</span><span className="font-bold">{repair.number}</span></div>
+      {repair.number && (
+        <div className="flex justify-center my-1">
+          <Barcode value={repair.number} height={38} moduleWidth={1.4} />
+        </div>
+      )}
       <div className="flex justify-between"><span>Date dépôt</span><span>{dateStr}</span></div>
       <div className="flex justify-between"><span>Statut</span><span>{REPAIR_STATUS_LABELS[repair.status]}</span></div>
       {line}
