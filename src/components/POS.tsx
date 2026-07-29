@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { Product, Client, SaleItem, Sale, Invoice, Category, StoreSettings, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
 import { Search, ShoppingCart, Trash2, Plus, Minus, User, CreditCard, CheckCircle, AlertCircle, Printer, X, FileText, Barcode, Filter, Tag, Coins, Percent, TrendingUp, UserCheck, Flame } from 'lucide-react';
-import { cn, decodeAzertyBarcode, isSparePart } from '../lib/utils';
+import { cn, decodeAzertyBarcode, isSparePart, isService } from '../lib/utils';
 import { format } from 'date-fns';
 import { PrintableTicket } from './PrintableTicket';
 
@@ -192,7 +192,7 @@ export default function POS({ userProfile }: POSProps) {
           // Find matching product
           const matchedProduct = products.find(p => p.barcode === barcode);
           if (matchedProduct) {
-            if (matchedProduct.stock <= 0) {
+            if (!isService(matchedProduct) && matchedProduct.stock <= 0) {
               setScanNotification({
                 message: `Rupture de Stock pour ${matchedProduct.name}`,
                 type: 'error'
@@ -258,7 +258,7 @@ export default function POS({ userProfile }: POSProps) {
       
       return (matchesName || matchesBarcode) && 
              (selectedCategory === 'all' || p.category === selectedCategory) &&
-             p.stock > 0;
+             (isService(p) || p.stock > 0);
     }).sort((a, b) => {
       const qtyDiff = (salesQtyMap[b.id] || 0) - (salesQtyMap[a.id] || 0);
       if (qtyDiff !== 0) return qtyDiff;
@@ -283,7 +283,7 @@ export default function POS({ userProfile }: POSProps) {
       const trimmedSearch = searchTerm.trim();
       const decodedSearch = decodeAzertyBarcode(trimmedSearch);
       // Try to find exact barcode match (either original or decoded)
-      const product = products.find(p => (p.barcode === trimmedSearch || p.barcode === decodedSearch) && p.stock > 0);
+      const product = products.find(p => (p.barcode === trimmedSearch || p.barcode === decodedSearch) && (isService(p) || p.stock > 0));
       if (product) {
         addToCart(product);
         setSearchTerm('');
@@ -296,9 +296,14 @@ export default function POS({ userProfile }: POSProps) {
   const [selectedCartItemId, setSelectedCartItemId] = useState<string | null>(null);
 
   const addToCart = (product: Product) => {
+    const service = isService(product);
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
+        // Un service reste à quantité 1 (pas de cumul).
+        if (service) {
+          return prev;
+        }
         if (existing.quantity >= product.stock) {
           setError(`Stock insuffisant pour ${product.name} (Disponible: ${product.stock})`);
           setTimeout(() => setError(null), 3000);
@@ -327,6 +332,10 @@ export default function POS({ userProfile }: POSProps) {
     setCart(prev => prev.map(item => {
       if (item.productId === productId) {
         const product = products.find(p => p.id === productId);
+        // Un service est verrouillé à quantité 1.
+        if (product && isService(product)) {
+          return item;
+        }
         const newQty = Math.max(1, item.quantity + delta);
         
         if (product) {
@@ -429,6 +438,8 @@ export default function POS({ userProfile }: POSProps) {
   const setQuantityDirect = (productId: string, newQty: number) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
+    // Un service reste toujours à quantité 1.
+    if (isService(product)) return;
     if (newQty < 1) {
       removeFromCart(productId);
       return;
@@ -600,6 +611,8 @@ export default function POS({ userProfile }: POSProps) {
             const item = cart[i];
             const productSnap = productSnaps[i];
             if (!productSnap.exists()) throw new Error(`Produit ${item.name} introuvable`);
+            // Un service n'a pas de stock : ni validation, ni décrémentation.
+            if (productSnap.data().isService === true) continue;
             const currentStock = productSnap.data().stock || 0;
             if (currentStock < item.quantity) throw new Error(`Stock insuffisant pour ${item.name} (Disponible: ${currentStock})`);
             stockUpdates.push({
@@ -731,7 +744,7 @@ export default function POS({ userProfile }: POSProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <div className="relative flex items-center justify-center">
-                  <Barcode className={cn("w-4 h-4 text-indigo-600", scannerActive && "animate-pulse")} />
+                  <Barcode className={cn("w-4 h-4 text-emerald-600", scannerActive && "animate-pulse")} />
                   {scannerActive && <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />}
                 </div>
                 <div className="flex flex-col leading-tight">
@@ -768,7 +781,7 @@ export default function POS({ userProfile }: POSProps) {
                         if (code !== '') {
                           const matchedProduct = products.find(p => p.barcode === code);
                           if (matchedProduct) {
-                            if (matchedProduct.stock <= 0) {
+                            if (!isService(matchedProduct) && matchedProduct.stock <= 0) {
                               setScanNotification({
                                 message: `Rupture : ${matchedProduct.name}`,
                                 type: 'error'
@@ -808,7 +821,7 @@ export default function POS({ userProfile }: POSProps) {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-semibold text-xs text-slate-800"
+              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all font-semibold text-xs text-slate-800"
             />
           </div>
 
@@ -819,8 +832,8 @@ export default function POS({ userProfile }: POSProps) {
               className={cn(
                 "px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all border cursor-pointer",
                 selectedCategory === 'all' 
-                  ? "bg-indigo-600 text-white border-indigo-600 shadow-xs" 
-                  : "bg-white text-gray-500 border-gray-200 hover:border-indigo-500 hover:text-indigo-600"
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-xs" 
+                  : "bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-600"
               )}
             >
               Tous
@@ -832,8 +845,8 @@ export default function POS({ userProfile }: POSProps) {
                 className={cn(
                   "px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all border cursor-pointer",
                   selectedCategory === cat.name 
-                    ? "bg-indigo-600 text-white border-indigo-600 shadow-xs" 
-                    : "bg-white text-gray-500 border-gray-200 hover:border-indigo-500 hover:text-indigo-600"
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-xs" 
+                    : "bg-white text-gray-500 border-gray-200 hover:border-emerald-500 hover:text-emerald-600"
                 )}
               >
                 {cat.name}
@@ -848,14 +861,14 @@ export default function POS({ userProfile }: POSProps) {
             <button
               key={product.id}
               onClick={() => addToCart(product)}
-              disabled={product.stock <= 0}
+              disabled={!isService(product) && product.stock <= 0}
               className={cn(
                 "relative bg-white rounded-2xl border border-slate-200/80 shadow-3xs text-left flex flex-col justify-between group overflow-hidden h-[110px] min-w-0 w-full cursor-pointer transition-all duration-150",
-                "hover:border-transparent hover:shadow-lg hover:shadow-violet-500/15 hover:-translate-y-0.5 hover:ring-2 hover:ring-violet-500/60 active:scale-[0.97]",
-                product.stock <= 0 && "opacity-60 grayscale cursor-not-allowed"
+                "hover:border-transparent hover:shadow-lg hover:shadow-emerald-500/15 hover:-translate-y-0.5 hover:ring-2 hover:ring-emerald-500/60 active:scale-[0.97]",
+                !isService(product) && product.stock <= 0 && "opacity-60 grayscale cursor-not-allowed"
               )}
             >
-              <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-violet-600 via-fuchsia-500 to-violet-600 opacity-70 group-hover:opacity-100 transition-opacity"></div>
+              <div className="absolute top-0 left-0 right-0 h-[3px] bg-emerald-600 opacity-70 group-hover:opacity-100 transition-opacity"></div>
 
               <div className="w-full flex justify-between items-center gap-1 px-2 pt-2">
                 <span className="flex items-center gap-1 text-[7px] font-black uppercase tracking-wider truncate max-w-[60%] text-slate-400">
@@ -863,11 +876,11 @@ export default function POS({ userProfile }: POSProps) {
                     "w-1.5 h-1.5 rounded-full shrink-0",
                     (() => {
                       const cat = categories.find(c => c.name === product.category);
-                      if (!cat) return "bg-violet-500";
+                      if (!cat) return "bg-emerald-500";
                       return cat.type === 'piece' ? "bg-blue-500" :
                              cat.type === 'accessoire' ? "bg-orange-500" :
-                             cat.type === 'service' ? "bg-fuchsia-500" :
-                             "bg-violet-500";
+                             cat.type === 'service' ? "bg-teal-500" :
+                             "bg-emerald-500";
                     })()
                   )}></span>
                   {product.category}
@@ -877,36 +890,42 @@ export default function POS({ userProfile }: POSProps) {
                     <Flame className="w-2.5 h-2.5" /> Top
                   </span>
                 ) : (salesQtyMap[product.id] || 0) > 0 ? (
-                  <span className="text-[7px] font-black text-violet-400 uppercase tracking-wider shrink-0">
+                  <span className="text-[7px] font-black text-emerald-400 uppercase tracking-wider shrink-0">
                     {salesQtyMap[product.id]} vendus
                   </span>
                 ) : null}
               </div>
 
               <div className="flex-1 flex items-center px-2 py-0.5 min-w-0 w-full">
-                <h3 className="font-extrabold text-slate-800 text-[11px] leading-tight break-words whitespace-normal overflow-hidden line-clamp-2 text-ellipsis group-hover:text-violet-700 transition-colors w-full">
+                <h3 className="font-extrabold text-slate-800 text-[11px] leading-tight break-words whitespace-normal overflow-hidden line-clamp-2 text-ellipsis group-hover:text-emerald-700 transition-colors w-full">
                   {product.name}
                 </h3>
               </div>
 
               <div className="w-full px-2 pb-2 flex items-center justify-between gap-1 mt-auto">
                 <div className="min-w-0">
-                  <span className="text-[12px] font-black bg-gradient-to-r from-violet-700 to-fuchsia-600 bg-clip-text text-transparent truncate block leading-none">
+                  <span className="text-[12px] font-black text-emerald-700 truncate block leading-none">
                     {product.sellPrice.toFixed(3)} <span className="text-[8px] font-bold">{currency}</span>
                   </span>
+                  {isService(product) ? (
+                    <span className="text-[7px] font-black uppercase tracking-wider text-teal-600">
+                      Service
+                    </span>
+                  ) : (
                   <span className={cn(
                     "text-[7px] font-black uppercase tracking-wider",
                     product.stock <= 5 ? "text-rose-600" : "text-slate-400"
                   )}>
                     Stock {product.stock}
                   </span>
+                  )}
                 </div>
-                <div className="w-6 h-6 rounded-full bg-violet-50 text-violet-600 group-hover:bg-gradient-to-r group-hover:from-violet-600 group-hover:to-fuchsia-600 group-hover:text-white group-hover:scale-110 transition-all duration-150 shrink-0 flex items-center justify-center shadow-3xs">
+                <div className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:scale-110 transition-all duration-150 shrink-0 flex items-center justify-center shadow-3xs">
                   <Plus className="w-3.5 h-3.5" />
                 </div>
               </div>
 
-              {product.stock <= 0 && (
+              {!isService(product) && product.stock <= 0 && (
                 <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] rounded-xl flex items-center justify-center p-1 text-center">
                   <div className="bg-rose-600 text-white px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider shadow-xs">
                     Rupture
@@ -925,7 +944,7 @@ export default function POS({ userProfile }: POSProps) {
           {/* Header Ticket block */}
           <div className="p-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
             <h2 className="font-black text-slate-700 flex items-center gap-1.5 text-xs uppercase tracking-wider">
-              <ShoppingCart className="w-4.5 h-4.5 text-indigo-600" />
+              <ShoppingCart className="w-4.5 h-4.5 text-emerald-600" />
               Ticket de caisse ({cart.length})
             </h2>
             <button 
@@ -945,7 +964,7 @@ export default function POS({ userProfile }: POSProps) {
           <div className="p-2.5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <div className="w-full relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <UserCheck className="h-4.5 w-4.5 text-indigo-600" />
+                <UserCheck className="h-4.5 w-4.5 text-emerald-600" />
               </div>
               <select
                 value={selectedClient?.id || ''}
@@ -957,7 +976,7 @@ export default function POS({ userProfile }: POSProps) {
                     setReceivedCashInput(cartTotal.toFixed(3));
                   }
                 }}
-                className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/15 focus:border-indigo-500 transition-all shadow-3xs"
+                className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500 transition-all shadow-3xs"
               >
                 <option value="">👤 Client de passage</option>
                 {clients.map(c => (
@@ -994,7 +1013,7 @@ export default function POS({ userProfile }: POSProps) {
                         className={cn(
                           "transition-colors group cursor-pointer",
                           selectedCartItemId === item.productId
-                            ? "bg-indigo-50/90 shadow-[inset_2px_0_0_0_theme(colors.indigo.500)]"
+                            ? "bg-emerald-50/90 shadow-[inset_2px_0_0_0_theme(colors.emerald.500)]"
                             : "hover:bg-slate-50/75"
                         )}
                       >
@@ -1046,7 +1065,7 @@ export default function POS({ userProfile }: POSProps) {
                                   }
                                   e.stopPropagation();
                                 }}
-                                className="w-10 text-xs font-black text-slate-900 font-mono text-center bg-white border border-indigo-400 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500/30 px-1 py-0.5"
+                                className="w-10 text-xs font-black text-slate-900 font-mono text-center bg-white border border-emerald-400 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500/30 px-1 py-0.5"
                               />
                             ) : (
                               <span
@@ -1054,7 +1073,7 @@ export default function POS({ userProfile }: POSProps) {
                                   setEditingQtyId(item.productId);
                                   setEditingQtyValue(String(item.quantity));
                                 }}
-                                className="w-8 text-xs sm:text-sm font-black text-slate-850 font-mono text-center cursor-pointer hover:bg-indigo-50 hover:text-indigo-600 rounded px-1 py-0.5 transition-colors select-none border border-transparent hover:border-indigo-200"
+                                className="w-8 text-xs sm:text-sm font-black text-slate-850 font-mono text-center cursor-pointer hover:bg-emerald-50 hover:text-emerald-600 rounded px-1 py-0.5 transition-colors select-none border border-transparent hover:border-emerald-200"
                                 title="Cliquer pour modifier la quantité"
                               >
                                 {item.quantity}
@@ -1077,8 +1096,8 @@ export default function POS({ userProfile }: POSProps) {
                         <td className="py-3 px-2 text-right font-semibold text-slate-550 font-mono text-xs sm:text-[13px]">
                           {item.price.toFixed(3)} <span className="text-[9px] font-medium text-slate-400">{currency}</span>
                         </td>
-                        <td className="py-3 px-2 text-right font-black text-indigo-650 font-mono text-xs sm:text-sm">
-                          {item.total.toFixed(3)} <span className="text-[10px] font-bold text-indigo-400">{currency}</span>
+                        <td className="py-3 px-2 text-right font-black text-emerald-700 font-mono text-xs sm:text-sm">
+                          {item.total.toFixed(3)} <span className="text-[10px] font-bold text-emerald-400">{currency}</span>
                         </td>
                         <td className="py-3 px-3 text-center">
                           <button 
@@ -1107,7 +1126,7 @@ export default function POS({ userProfile }: POSProps) {
                   {cart.reduce((sum, item) => sum + item.quantity, 0)} <span className="text-[9px] font-bold text-slate-500 uppercase">pces</span>
                 </span>
               </div>
-              <div className="w-6 h-6 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 ml-1">
+              <div className="w-6 h-6 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 ml-1">
                 <ShoppingCart className="w-3 h-3" />
               </div>
             </div>
@@ -1207,9 +1226,9 @@ export default function POS({ userProfile }: POSProps) {
               <div className="md:col-span-6 flex flex-col justify-between gap-2.5 bg-slate-850/45 p-3 rounded-xl border border-slate-800/60">
                 {/* GIANT DOCK FOR NET TOTAL */}
                 <div className="flex flex-col gap-1 text-center animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between text-indigo-300 font-black text-[9px] uppercase tracking-widest pb-1 border-b border-slate-800">
+                  <div className="flex items-center justify-between text-emerald-300 font-black text-[9px] uppercase tracking-widest pb-1 border-b border-slate-800">
                     <span>Total Net à payer</span>
-                    <span className="bg-indigo-500/10 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/20 text-[8px]">
+                    <span className="bg-emerald-500/10 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/20 text-[8px]">
                       {storeSettings?.tvaEnabled !== false ? `TVA (${storeSettings?.tva || 19}%)` : 'Hors taxe'}
                     </span>
                   </div>
@@ -1217,7 +1236,7 @@ export default function POS({ userProfile }: POSProps) {
                     <span className="text-3xl sm:text-4xl font-black font-mono tracking-tighter text-white leading-none drop-shadow-sm select-all">
                       {cartTotal.toFixed(3)}
                     </span>
-                    <span className="text-sm font-black text-indigo-400 uppercase tracking-wider ml-1">
+                    <span className="text-sm font-black text-emerald-400 uppercase tracking-wider ml-1">
                       {currency}
                     </span>
                   </div>
@@ -1231,7 +1250,7 @@ export default function POS({ userProfile }: POSProps) {
                       ? "bg-emerald-950/70 border-emerald-900 text-emerald-400"
                       : receivedCash < cartTotal
                         ? "bg-rose-950/70 border-rose-900 text-rose-300"
-                        : "bg-indigo-950/70 border-indigo-900 text-indigo-300"
+                        : "bg-emerald-950/70 border-emerald-900 text-emerald-300"
                   )}>
                     <div className="flex items-center gap-1 opacity-90">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -1533,7 +1552,7 @@ export default function POS({ userProfile }: POSProps) {
                   setSaleSuccess(null);
                   setLastInvoice(null);
                 }}
-                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm"
+                className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors cursor-pointer shadow-sm"
               >
                 Nouvelle Vente
               </button>
