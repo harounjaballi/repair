@@ -239,8 +239,7 @@ export default function Expenses({ userProfile }: ExpensesProps) {
               <thead>
                 <tr className="border-b border-slate-100 text-[10px] font-black uppercase tracking-wider text-slate-400 bg-slate-50/70">
                   <th className="px-5 py-3">Date</th>
-                  <th className="px-5 py-3">Catégorie</th>
-                  <th className="px-5 py-3">Description</th>
+                  <th className="px-5 py-3">Motif</th>
                   <th className="px-5 py-3 text-right">Montant</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
@@ -252,14 +251,6 @@ export default function Expenses({ userProfile }: ExpensesProps) {
                     <tr key={exp.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-5 py-3 whitespace-nowrap font-bold text-slate-600 font-mono">
                         {d ? d.toLocaleDateString('fr-FR') : '—'}
-                      </td>
-                      <td className="px-5 py-3 whitespace-nowrap">
-                        <span className={cn(
-                          'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border',
-                          CATEGORY_BADGES[exp.category] || CATEGORY_BADGES.autre
-                        )}>
-                          {EXPENSE_CATEGORY_LABELS[exp.category] || 'Autre'}
-                        </span>
                       </td>
                       <td className="px-5 py-3 font-bold text-slate-700">{exp.label}</td>
                       <td className="px-5 py-3 text-right font-black font-mono text-rose-600 whitespace-nowrap">
@@ -324,20 +315,7 @@ export default function Expenses({ userProfile }: ExpensesProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-                <select
-                  value={formCategory}
-                  onChange={(e) => setFormCategory(e.target.value as ExpenseCategory)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none bg-white"
-                >
-                  {(Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map(key => (
-                    <option key={key} value={key}>{EXPENSE_CATEGORY_LABELS[key]}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Motif</label>
                 <input
                   type="text"
                   required
