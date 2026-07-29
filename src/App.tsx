@@ -25,6 +25,7 @@ import {
   WifiOff,
   BarChart3,
   Wrench,
+  Wallet,
   Smartphone
 } from 'lucide-react';
 import { cn } from './lib/utils';
@@ -41,7 +42,7 @@ import Invoices from './components/Invoices';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import UsersManager from './components/Users';
-import Notes from './components/Notes';
+import Expenses from './components/Expenses';
 import Statistics from './components/Statistics';
 import Repairs from './components/Repairs';
 import RepairReports from './components/RepairReports';
@@ -158,14 +159,56 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 // Seul ce compte a accès à la rubrique Statistique (vue globale multi-magasins)
 export const SUPER_ADMIN_EMAIL = 'harounjaballi@gmail.com';
 
+// Rapport & Statistique : fusionne les Rapports atelier et (pour le super admin
+// uniquement) le panneau Statistique dans un seul menu, avec des onglets.
+function ReportsHub({ userProfile }: { userProfile: UserProfile | null }) {
+  const isSuperAdmin = userProfile?.email === SUPER_ADMIN_EMAIL;
+  const [tab, setTab] = useState<'reports' | 'stats'>('reports');
+
+  // Pour un utilisateur normal, seul le rapport atelier est disponible : pas d'onglets.
+  if (!isSuperAdmin) return <RepairReports userProfile={userProfile} />;
+
+  return (
+    <div>
+      <div className="flex gap-2 px-4 sm:px-6 pt-4">
+        <button
+          onClick={() => setTab('reports')}
+          className={cn(
+            "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
+            tab === 'reports'
+              ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/15"
+              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+          )}
+        >
+          Rapports atelier
+        </button>
+        <button
+          onClick={() => setTab('stats')}
+          className={cn(
+            "px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer",
+            tab === 'stats'
+              ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/15"
+              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+          )}
+        >
+          Statistique
+        </button>
+      </div>
+      {tab === 'reports'
+        ? <RepairReports userProfile={userProfile} />
+        : <Statistics userProfile={userProfile} />}
+    </div>
+  );
+}
+
 export function hasMenuAccess(userProfile: UserProfile | null, menuId: string): boolean {
   if (!userProfile) return false;
   
   // Custom permissions. Default standard and admin arrays if not present.
   let allowed = userProfile.allowedMenus || (
     userProfile.role === 'admin' 
-      ? ['dashboard', 'repairs', 'reports', 'pos', 'parts', 'products', 'clients', 'sales', 'invoices', 'notes', 'users', 'settings']
-      : ['dashboard', 'repairs', 'pos', 'parts', 'products', 'clients', 'sales', 'invoices', 'notes']
+      ? ['dashboard', 'repairs', 'reports', 'pos', 'parts', 'products', 'clients', 'sales', 'invoices', 'expenses', 'users', 'settings']
+      : ['dashboard', 'repairs', 'pos', 'parts', 'products', 'clients', 'sales', 'invoices', 'expenses']
   );
 
   // Backward compatibility: make sure existing admins always have users rights, but settings permission is controlled independently
@@ -184,6 +227,10 @@ export function hasMenuAccess(userProfile: UserProfile | null, menuId: string): 
     // Le menu Pièces a été séparé de Produits : garantir l'accès aux admins existants.
     if (!allowed.includes('parts')) {
       allowed = [...allowed, 'parts'];
+    }
+    // Le menu Dépenses est nouveau : garantir l'accès aux admins existants.
+    if (!allowed.includes('expenses')) {
+      allowed = [...allowed, 'expenses'];
     }
   }
   
@@ -222,22 +269,20 @@ function Sidebar({
   
   const allNavItems = [
     { id: 'dashboard', name: 'Tableau de bord', path: '/', icon: LayoutDashboard },
+    { id: 'pos', name: 'Vente (Caisse)', path: '/pos', icon: ShoppingCart },
     { id: 'repairs', name: 'Réparations', path: '/repairs', icon: Wrench },
-    { id: 'reports', name: 'Rapports atelier', path: '/reports', icon: BarChart3 },
-    { id: 'pos', name: 'Vente (POS)', path: '/pos', icon: ShoppingCart },
-    { id: 'parts', name: 'Pièces détachées', path: '/parts', icon: Wrench },
-    { id: 'products', name: 'Produits', path: '/products', icon: Package },
-    { id: 'clients', name: 'Clients', path: '/clients', icon: Users },
     { id: 'sales', name: 'Historique ventes', path: '/sales', icon: History },
-    { id: 'invoices', name: 'Factures', path: '/invoices', icon: FileText },
-    { id: 'notes', name: 'Mémos & Notes', path: '/notes', icon: StickyNote },
+    { id: 'products', name: 'Articles / Services', path: '/products', icon: Package },
+    { id: 'parts', name: 'Pièces détachées', path: '/parts', icon: Wrench },
+    { id: 'clients', name: 'Clients', path: '/clients', icon: Users },
+    { id: 'reports', name: 'Rapport & Statistique', path: '/reports', icon: BarChart3 },
+    { id: 'expenses', name: 'Dépenses', path: '/expenses', icon: Wallet },
+    { id: 'invoices', name: 'Facturation', path: '/invoices', icon: FileText },
     { id: 'settings', name: 'Paramètres', path: '/settings', icon: SettingsIcon },
     { id: 'users', name: 'Utilisateurs', path: '/users', icon: UserCheck, adminOnly: true },
-    { id: 'statistics', name: 'Statistique', path: '/statistics', icon: BarChart3, superAdminOnly: true },
   ];
 
   const navItems = allNavItems.filter((item) => {
-    if (item.superAdminOnly) return userProfile?.email === SUPER_ADMIN_EMAIL;
     if (item.adminOnly && userProfile?.role !== 'admin') return false;
     // "Paramètres" est toujours accessible : chaque utilisateur peut y changer
     // son code de sécurité (les paramètres du magasin restent soumis à la permission).
@@ -834,16 +879,16 @@ export default function App() {
               <Routes>
                 <Route path="/" element={hasMenuAccess(userProfile, 'dashboard') ? <Dashboard userProfile={userProfile} /> : <Navigate to={hasMenuAccess(userProfile, 'repairs') ? '/repairs' : (hasMenuAccess(userProfile, 'pos') ? '/pos' : (hasMenuAccess(userProfile, 'products') ? '/products' : (hasMenuAccess(userProfile, 'clients') ? '/clients' : (hasMenuAccess(userProfile, 'sales') ? '/sales' : (hasMenuAccess(userProfile, 'invoices') ? '/invoices' : '/settings')))))} replace />} />
                 <Route path="/repairs" element={hasMenuAccess(userProfile, 'repairs') ? <Repairs userProfile={userProfile} /> : <Navigate to="/" replace />} />
-                <Route path="/reports" element={hasMenuAccess(userProfile, 'reports') ? <RepairReports userProfile={userProfile} /> : <Navigate to="/" replace />} />
+                <Route path="/reports" element={hasMenuAccess(userProfile, 'reports') ? <ReportsHub userProfile={userProfile} /> : <Navigate to="/" replace />} />
                 <Route path="/parts" element={hasMenuAccess(userProfile, 'parts') ? <Products userProfile={userProfile} mode="part" /> : <Navigate to="/" replace />} />
                 <Route path="/products" element={hasMenuAccess(userProfile, 'products') ? <Products userProfile={userProfile} mode="product" /> : <Navigate to="/" replace />} />
                 <Route path="/clients" element={hasMenuAccess(userProfile, 'clients') ? <Clients userProfile={userProfile} /> : <Navigate to="/" replace />} />
                 <Route path="/pos" element={hasMenuAccess(userProfile, 'pos') ? <POS userProfile={userProfile} /> : <Navigate to="/" replace />} />
                 <Route path="/sales" element={hasMenuAccess(userProfile, 'sales') ? <Sales userProfile={userProfile} /> : <Navigate to="/" replace />} />
                 <Route path="/invoices" element={hasMenuAccess(userProfile, 'invoices') ? <Invoices userProfile={userProfile} /> : <Navigate to="/" replace />} />
-                <Route path="/notes" element={hasMenuAccess(userProfile, 'notes') ? <Notes userProfile={userProfile} /> : <Navigate to="/" replace />} />
+                <Route path="/expenses" element={hasMenuAccess(userProfile, 'expenses') ? <Expenses userProfile={userProfile} /> : <Navigate to="/" replace />} />
                 <Route path="/users" element={userProfile?.role === 'admin' && hasMenuAccess(userProfile, 'users') ? <UsersManager userProfile={userProfile} /> : <Navigate to="/" replace />} />
-                <Route path="/statistics" element={userProfile?.email === SUPER_ADMIN_EMAIL ? <Statistics userProfile={userProfile} /> : <Navigate to="/" replace />} />
+                <Route path="/statistics" element={<Navigate to="/reports" replace />} />
                 {/* /settings accessible à tous : le composant Settings n'affiche que la carte "Mon code de sécurité" aux utilisateurs sans permission */}
                 <Route path="/settings" element={<Settings userProfile={userProfile} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
