@@ -223,8 +223,9 @@ export default function Dashboard({ userProfile }: DashboardProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Real-time track and aggregate stock supplies (expenses/dépenses)
-  const [supplies, setSupplies] = useState<any[]>([]);
+  // Suivi temps réel des dépenses saisies dans le menu Dépenses (collection 'expenses').
+  // Les approvisionnements de stock (supplies) ne sont PAS comptés comme dépenses.
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [expensesTab, setExpensesTab] = useState<'daily' | 'detailed'>('daily');
   const [expensesSearch, setExpensesSearch] = useState('');
   const [expensesPage, setExpensesPage] = useState(1);
@@ -262,15 +263,15 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'products'));
 
-    const unsubscribeSupplies = onSnapshot(query(collection(db, 'supplies'), where('ownerId', '==', ownerId)), (snapshot) => {
-      const sups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      sups.sort((a, b) => {
-        const timeA = a.date?.seconds || (a.date instanceof Date ? a.date.getTime() : 0);
-        const timeB = b.date?.seconds || (b.date instanceof Date ? b.date.getTime() : 0);
+    const unsubscribeExpenses = onSnapshot(query(collection(db, 'expenses'), where('ownerId', '==', ownerId)), (snapshot) => {
+      const exps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      exps.sort((a, b) => {
+        const timeA = typeof a.date?.toDate === 'function' ? a.date.toDate().getTime() : new Date(a.date || 0).getTime();
+        const timeB = typeof b.date?.toDate === 'function' ? b.date.toDate().getTime() : new Date(b.date || 0).getTime();
         return timeB - timeA;
       });
-      setSupplies(sups);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, 'supplies'));
+      setExpenses(exps);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'expenses'));
 
     const unsubscribeStore = onSnapshot(doc(db, 'settings', ownerId), (snapshot) => {
       if (snapshot.exists()) {
@@ -282,7 +283,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     return () => {
       unsubscribeSales();
       unsubscribeProds();
-      unsubscribeSupplies();
+      unsubscribeExpenses();
       unsubscribeStore();
     };
   }, []);
@@ -337,34 +338,19 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     });
 
     // Today's Supplies / Expenses
-    const getSupplyDate = (sup: any) => {
-      if (!sup.date) return new Date();
-      if (typeof sup.date.toDate === 'function') return sup.date.toDate();
-      if (sup.date instanceof Date) return sup.date;
-      return new Date(sup.date);
+    const getExpenseDate = (exp: any) => {
+      if (!exp.date) return new Date();
+      if (typeof exp.date.toDate === 'function') return exp.date.toDate();
+      if (exp.date instanceof Date) return exp.date;
+      return new Date(exp.date);
     };
 
-    const todaySupplies = supplies.filter(sup => {
-      const supDate = getSupplyDate(sup);
-      return isSameDayRobust(supDate, today);
+    const todayExpenses = expenses.filter(exp => {
+      const expDate = getExpenseDate(exp);
+      return isSameDayRobust(expDate, today);
     });
 
-    const dailyExpenses = todaySupplies.reduce((sum, sup) => sum + (sup.totalCost || 0), 0);
-
-    console.log('[DEBUG] Calcul des Dépenses du Jour:', {
-      totalSuppliesFetched: supplies.length,
-      todaySuppliesFilteredCount: todaySupplies.length,
-      dailyExpensesValue: dailyExpenses,
-      todayDateStr: today.toDateString(),
-      suppliesData: todaySupplies.map(s => ({
-        id: s.id,
-        productName: s.productName,
-        quantity: s.quantity,
-        buyPrice: s.buyPrice,
-        totalCost: s.totalCost,
-        date: s.date
-      }))
-    });
+    const dailyExpenses = todayExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
 
     // 2. Chiffre d'affaires
     const dailyRevenue = todaySales.reduce((sum, s) => sum + s.total, 0);
@@ -415,7 +401,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       lowStockAlerts,
       todaySales
     };
-  }, [sales, products, productBuyPriceMap, supplies]);
+  }, [sales, products, productBuyPriceMap, expenses]);
 
   // Group ALL sales chronologically by day to build historical statistics dynamically
   const dailyRecords = useMemo(() => {
@@ -470,18 +456,17 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     return Object.values(dailyMap);
   }, [sales, productBuyPriceMap]);
 
-  // Group ALL supplies chronologically by day to build historical expenses statistics dynamically
-  const dailySuppliesRecords = useMemo(() => {
+  // Regroupe TOUTES les dépenses par jour pour les statistiques historiques
+  const dailyExpenseRecords = useMemo(() => {
     const dailyMap: Record<string, {
       dateStr: string; // YYYY-MM-DD
       dateObj: Date;
-      productsCount: number; // unique operations or product additions count
-      totalQty: number;      // total items added
-      totalExpenses: number; // total cost of purchases
+      opsCount: number;      // nombre d'opérations de dépense
+      totalExpenses: number; // total dépensé ce jour
     }> = {};
 
-    supplies.forEach(sup => {
-      const sDate = !sup.date ? new Date() : (typeof sup.date.toDate === 'function' ? sup.date.toDate() : new Date(sup.date));
+    expenses.forEach(exp => {
+      const sDate = !exp.date ? new Date() : (typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date));
       const year = sDate.getFullYear();
       const month = String(sDate.getMonth() + 1).padStart(2, '0');
       const day = String(sDate.getDate()).padStart(2, '0');
@@ -491,20 +476,18 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         dailyMap[dayKey] = {
           dateStr: dayKey,
           dateObj: sDate,
-          productsCount: 0,
-          totalQty: 0,
+          opsCount: 0,
           totalExpenses: 0
         };
       }
 
       const record = dailyMap[dayKey];
-      record.productsCount += 1;
-      record.totalQty += (sup.quantity || 0);
-      record.totalExpenses += (sup.totalCost || 0);
+      record.opsCount += 1;
+      record.totalExpenses += (exp.amount || 0);
     });
 
     return Object.values(dailyMap).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
-  }, [supplies]);
+  }, [expenses]);
 
   // Handle Search & Filter & Sorter for the Active Historical Data
   const filteredAndSortedRecords = useMemo(() => {
@@ -781,46 +764,51 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     setExpensesPage(1);
   };
 
-  const filteredSupplies = useMemo(() => {
-    let result = [...supplies];
+  const filteredExpenses = useMemo(() => {
+    let result = [...expenses];
     if (expensesSearch.trim() !== '') {
       const q = expensesSearch.toLowerCase();
-      result = result.filter(sup => 
-        (sup.productName || '').toLowerCase().includes(q) ||
-        (sup.date && typeof sup.date.toDate === 'function' && sup.date.toDate().toLocaleDateString('fr-FR').includes(q))
+      result = result.filter(exp => 
+        (exp.label || '').toLowerCase().includes(q) ||
+        (exp.category || '').toLowerCase().includes(q) ||
+        (exp.date && new Date(exp.date).toLocaleDateString('fr-FR').includes(q))
       );
     }
     return result;
-  }, [supplies, expensesSearch]);
+  }, [expenses, expensesSearch]);
 
-  const paginatedSupplies = useMemo(() => {
+  const paginatedExpenses = useMemo(() => {
     const start = (expensesPage - 1) * expensesItemsPerPage;
-    return filteredSupplies.slice(start, start + expensesItemsPerPage);
-  }, [filteredSupplies, expensesPage]);
+    return filteredExpenses.slice(start, start + expensesItemsPerPage);
+  }, [filteredExpenses, expensesPage]);
 
-  const totalExpensesPages = Math.ceil(filteredSupplies.length / expensesItemsPerPage);
+  const totalExpensesPages = Math.ceil(filteredExpenses.length / expensesItemsPerPage);
 
   const exportExpensesToExcel = () => {
     try {
       let rows: any[] = [];
       let filename = '';
       if (expensesTab === 'daily') {
-        rows = dailySuppliesRecords.map(rec => ({
+        rows = dailyExpenseRecords.map(rec => ({
           'Date': rec.dateObj.toLocaleDateString('fr-FR'),
-          'Nombre de produits ajoutés': rec.productsCount,
-          'Quantité totale ajoutée': rec.totalQty,
+          'Nombre d\'opérations': rec.opsCount,
           'Dépenses totales (DT)': rec.totalExpenses.toFixed(3)
         }));
         filename = `Depenses_Journalieres`;
       } else {
-        rows = supplies.map(sup => {
-          const timestampStr = !sup.date ? '' : (typeof sup.date.toDate === 'function' ? sup.date.toDate().toLocaleString('fr-FR') : new Date(sup.date).toLocaleString('fr-FR'));
+        rows = expenses.map(exp => {
+          const timestampStr = !exp.date ? '' : (typeof exp.date.toDate === 'function' ? exp.date.toDate().toLocaleString('fr-FR') : new Date(exp.date).toLocaleString('fr-FR'));
+          const categoryLabels: Record<string, string> = {
+            achat_pieces: 'Achat de pièces',
+            charges: 'Charges',
+            journaliere: 'Dépense journalière',
+            autre: 'Autre',
+          };
           return {
             'Date et Heure': timestampStr,
-            'Produit': sup.productName || '',
-            'Quantité Ajoutée': sup.quantity || 0,
-            'Prix d\'achat unitaire (DT)': (sup.buyPrice || 0).toFixed(3),
-            'Coût Total (DT)': (sup.totalCost || 0).toFixed(3)
+            'Catégorie': categoryLabels[exp.category] || 'Autre',
+            'Description': exp.label || '',
+            'Montant (DT)': (exp.amount || 0).toFixed(3)
           };
         });
         filename = `Details_Depenses`;
@@ -1920,7 +1908,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                   type="text"
                   value={expensesSearch}
                   onChange={(e) => { setExpensesSearch(e.target.value); setExpensesPage(1); }}
-                  placeholder={expensesTab === 'daily' ? "Rechercher une date (ex: 22/06)..." : "Rechercher un produit ou date..."}
+                  placeholder={expensesTab === 'daily' ? "Rechercher une date (ex: 22/06)..." : "Rechercher une dépense ou date..."}
                   className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500/10 focus:border-amber-500 transition-all"
                 />
               </div>
@@ -1930,26 +1918,25 @@ export default function Dashboard({ userProfile }: DashboardProps) {
             <div className="overflow-y-auto grow font-sans p-6">
               {expensesTab === 'daily' ? (
                 // Tab 1: Daily grouping list
-                dailySuppliesRecords.length === 0 ? (
+                dailyExpenseRecords.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-450 border border-slate-100 mb-2">
                       <AlertCircle className="w-5 h-5 text-slate-400" />
                     </div>
-                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Aucun approvisionnement</h4>
-                    <p className="text-slate-450 text-[11px] mt-1">Ajoutez du stock aux articles pour suivre vos dépenses.</p>
+                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Aucune dépense</h4>
+                    <p className="text-slate-450 text-[11px] mt-1">Enregistrez vos sorties de caisse dans le menu Dépenses.</p>
                   </div>
                 ) : (
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-150 text-[10px] font-black uppercase tracking-wider text-slate-450 bg-slate-50/70">
                         <th className="px-6 py-3">Date</th>
-                        <th className="px-6 py-3 text-center">Nbre de Produits Ajoutés</th>
-                        <th className="px-6 py-3 text-center">Quantité Totale Ajoutée</th>
+                        <th className="px-6 py-3 text-center">Nombre d'Opérations</th>
                         <th className="px-6 py-3 text-right">Dépenses Totales</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {dailySuppliesRecords.map((rec) => {
+                      {dailyExpenseRecords.map((rec) => {
                         const formattedDate = rec.dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
                         return (
                           <tr key={rec.dateStr} className="hover:bg-slate-50/50 transition-colors">
@@ -1957,10 +1944,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                               {formattedDate}
                             </td>
                             <td className="px-6 py-3.5 text-center font-bold text-slate-600 font-mono">
-                              {rec.productsCount}
-                            </td>
-                            <td className="px-6 py-3.5 text-center font-bold text-slate-600 font-mono">
-                              {rec.totalQty}
+                              {rec.opsCount}
                             </td>
                             <td className="px-6 py-3.5 text-right whitespace-nowrap">
                               <span className="px-3 py-1 bg-amber-50 text-amber-700 font-black font-mono rounded-lg border border-amber-100 text-xs">
@@ -1975,7 +1959,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                 )
               ) : (
                 // Tab 2: Detailed Raw entries
-                filteredSupplies.length === 0 ? (
+                filteredExpenses.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-450 border border-slate-100 mb-2">
                       <AlertCircle className="w-5 h-5 text-slate-400" />
@@ -1988,15 +1972,14 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                     <thead>
                       <tr className="border-b border-slate-150 text-[10px] font-black uppercase tracking-wider text-slate-450 bg-slate-50/70">
                         <th className="px-6 py-3">Date et Heure</th>
-                        <th className="px-6 py-3">Produit</th>
-                        <th className="px-6 py-3 text-center">Quantité Ajoutée</th>
-                        <th className="px-6 py-3 text-right">Prix d'Achat unitaire</th>
-                        <th className="px-6 py-3 text-right">Coût Total</th>
+                        <th className="px-6 py-3">Catégorie</th>
+                        <th className="px-6 py-3">Description</th>
+                        <th className="px-6 py-3 text-right">Montant</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {paginatedSupplies.map((sup: any) => {
-                        const dateObj = !sup.date ? new Date() : (typeof sup.date.toDate === 'function' ? sup.date.toDate() : new Date(sup.date));
+                      {paginatedExpenses.map((exp: any) => {
+                        const dateObj = !exp.date ? new Date() : (typeof exp.date.toDate === 'function' ? exp.date.toDate() : new Date(exp.date));
                         const formattedDateTime = dateObj.toLocaleString('fr-FR', { 
                           day: '2-digit', 
                           month: 'short', 
@@ -2004,22 +1987,25 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                           hour: '2-digit',
                           minute: '2-digit'
                         });
+                        const categoryLabels: Record<string, string> = {
+                          achat_pieces: 'Achat de pièces',
+                          charges: 'Charges',
+                          journaliere: 'Dépense journalière',
+                          autre: 'Autre',
+                        };
                         return (
-                          <tr key={sup.id} className="hover:bg-slate-50/50 transition-colors">
+                          <tr key={exp.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="px-6 py-3.5 whitespace-nowrap text-slate-400 font-bold font-mono">
                               {formattedDateTime}
                             </td>
+                            <td className="px-6 py-3.5 font-bold text-slate-600">
+                              {categoryLabels[exp.category] || 'Autre'}
+                            </td>
                             <td className="px-6 py-3.5 font-bold text-slate-700">
-                              {sup.productName || 'Produit supprimé'}
-                            </td>
-                            <td className="px-6 py-3.5 text-center font-extrabold text-slate-800 font-mono">
-                              {sup.quantity || 0}
-                            </td>
-                            <td className="px-6 py-3.5 text-right font-semibold text-slate-650 font-mono">
-                              {(sup.buyPrice || 0).toFixed(3)} {currency}
+                              {exp.label || '—'}
                             </td>
                             <td className="px-6 py-3.5 text-right font-black text-amber-700 font-mono">
-                              {(sup.totalCost || 0).toFixed(3)} {currency}
+                              {(exp.amount || 0).toFixed(3)} {currency}
                             </td>
                           </tr>
                         );
@@ -2056,7 +2042,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                 </div>
               ) : (
                 <div className="text-xs font-bold text-slate-450 block uppercase tracking-wide">
-                  Total : {expensesTab === 'daily' ? dailySuppliesRecords.length : filteredSupplies.length} enregistrements
+                  Total : {expensesTab === 'daily' ? dailyExpenseRecords.length : filteredExpenses.length} enregistrements
                 </div>
               )}
 
