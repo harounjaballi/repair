@@ -1219,24 +1219,24 @@ export default function POS({ userProfile }: POSProps) {
           </div>
 
           {/* Bottom Checkout Zone (Always Visible & Split for Wide Screens) */}
-          <div className="bg-slate-900 border-t border-slate-950 p-3.5 space-y-3 rounded-b-2xl">
+          <div className="bg-white border-t border-slate-200 p-3.5 space-y-3 rounded-b-2xl">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
               
               {/* Left Column: Total Net & Real-time Change Calculator */}
-              <div className="md:col-span-6 flex flex-col justify-between gap-2.5 bg-slate-850/45 p-3 rounded-xl border border-slate-800/60">
+              <div className="md:col-span-6 flex flex-col justify-between gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 {/* GIANT DOCK FOR NET TOTAL */}
                 <div className="flex flex-col gap-1 text-center animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between text-emerald-300 font-black text-[9px] uppercase tracking-widest pb-1 border-b border-slate-800">
+                  <div className="flex items-center justify-between text-emerald-700 font-black text-[9px] uppercase tracking-widest pb-1 border-b border-slate-200">
                     <span>Total Net à payer</span>
-                    <span className="bg-emerald-500/10 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/20 text-[8px]">
+                    <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200 text-[8px]">
                       {storeSettings?.tvaEnabled !== false ? `TVA (${storeSettings?.tva || 19}%)` : 'Hors taxe'}
                     </span>
                   </div>
                   <div className="flex justify-center items-center gap-1 mt-1.5">
-                    <span className="text-3xl sm:text-4xl font-black font-mono tracking-tighter text-white leading-none drop-shadow-sm select-all">
+                    <span className="text-3xl sm:text-4xl font-black font-mono tracking-tighter text-emerald-700 leading-none drop-shadow-sm select-all">
                       {cartTotal.toFixed(3)}
                     </span>
-                    <span className="text-sm font-black text-emerald-400 uppercase tracking-wider ml-1">
+                    <span className="text-sm font-black text-emerald-600 uppercase tracking-wider ml-1">
                       {currency}
                     </span>
                   </div>
@@ -1247,10 +1247,10 @@ export default function POS({ userProfile }: POSProps) {
                   <div className={cn(
                     "p-2 rounded-lg border flex items-center justify-between text-xs font-bold leading-none shadow-sm transition-all duration-200 mt-1",
                     receivedCash > cartTotal
-                      ? "bg-emerald-950/70 border-emerald-900 text-emerald-400"
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                       : receivedCash < cartTotal
-                        ? "bg-rose-950/70 border-rose-900 text-rose-300"
-                        : "bg-emerald-950/70 border-emerald-900 text-emerald-300"
+                        ? "bg-rose-50 border-rose-200 text-rose-700"
+                        : "bg-emerald-50 border-emerald-200 text-emerald-600"
                   )}>
                     <div className="flex items-center gap-1 opacity-90">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -1276,8 +1276,8 @@ export default function POS({ userProfile }: POSProps) {
               {/* Right Column: Cash Received Input & Big Validation Button */}
               <div className="md:col-span-6 flex flex-col justify-between gap-2">
                 {/* HIGH CONTRAST RECEIVED AMOUNT INPUT */}
-                <div className="bg-slate-800/80 border border-slate-750 rounded-xl p-2 flex flex-col gap-1 shadow-inner">
-                  <div className="flex justify-between items-center text-[9px] font-black text-emerald-400 uppercase tracking-wider">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 flex flex-col gap-1 shadow-inner">
+                  <div className="flex justify-between items-center text-[9px] font-black text-emerald-700 uppercase tracking-wider">
                     <span>Montant Reçu</span>
                     <button 
                       type="button"
@@ -1290,7 +1290,7 @@ export default function POS({ userProfile }: POSProps) {
                       Tout Payer
                     </button>
                   </div>
-                  <div className="flex items-center justify-between border-b border-slate-700 pb-0.5">
+                  <div className="flex items-center justify-between border-b border-slate-300 pb-0.5">
                     <CreditCard className="w-4 h-4 text-emerald-500 mr-1.5 shrink-0" />
                     <input
                       type="text"
@@ -1327,7 +1327,7 @@ export default function POS({ userProfile }: POSProps) {
                         }
                       }}
                       placeholder="0.000"
-                      className="w-full bg-transparent text-right text-lg font-black font-mono text-emerald-400 focus:outline-none focus:ring-0 p-0 select-all"
+                      className="w-full bg-transparent text-right text-lg font-black font-mono text-emerald-700 focus:outline-none focus:ring-0 p-0 select-all"
                     />
                     <span className="text-xs font-black text-emerald-500 ml-1 shrink-0">{currency}</span>
                   </div>
@@ -1344,7 +1344,7 @@ export default function POS({ userProfile }: POSProps) {
                             return updated;
                           });
                         }}
-                        className="text-[8px] font-black bg-slate-700 hover:bg-slate-650 text-slate-200 px-1.5 py-0.5 rounded cursor-pointer"
+                        className="text-[8px] font-black bg-slate-200 hover:bg-slate-300 text-slate-700 px-1.5 py-0.5 rounded cursor-pointer"
                       >
                         +{val} DT
                       </button>
@@ -1392,15 +1392,15 @@ export default function POS({ userProfile }: POSProps) {
 
             {/* Warning de paiement pour client passager */}
             {!selectedClient && Math.abs(paidAmount - cartTotal) > 0.001 && (
-              <div className="text-[9px] text-rose-300 font-semibold bg-rose-950/40 border border-rose-900/60 rounded-lg p-2 flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+              <div className="text-[9px] text-rose-700 font-semibold bg-rose-50 border border-rose-200 rounded-lg p-2 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-500" />
                 <span>Le montant reçu doit correspondre exactement au montant total pour un client passager.</span>
               </div>
             )}
 
             {error && (
-              <div className="p-2 bg-rose-950/40 border border-rose-900/60 rounded-lg flex items-center gap-1.5 text-rose-300 text-[10px] font-semibold">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+              <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-1.5 text-rose-700 text-[10px] font-semibold">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-500" />
                 <span className="leading-tight">{error}</span>
               </div>
             )}
