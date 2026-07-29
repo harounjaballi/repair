@@ -164,8 +164,8 @@ export function hasMenuAccess(userProfile: UserProfile | null, menuId: string): 
   // Custom permissions. Default standard and admin arrays if not present.
   let allowed = userProfile.allowedMenus || (
     userProfile.role === 'admin' 
-      ? ['dashboard', 'repairs', 'reports', 'pos', 'products', 'clients', 'sales', 'invoices', 'notes', 'users', 'settings']
-      : ['dashboard', 'repairs', 'pos', 'products', 'clients', 'sales', 'invoices', 'notes']
+      ? ['dashboard', 'repairs', 'reports', 'pos', 'parts', 'products', 'clients', 'sales', 'invoices', 'notes', 'users', 'settings']
+      : ['dashboard', 'repairs', 'pos', 'parts', 'products', 'clients', 'sales', 'invoices', 'notes']
   );
 
   // Backward compatibility: make sure existing admins always have users rights, but settings permission is controlled independently
@@ -180,6 +180,10 @@ export function hasMenuAccess(userProfile: UserProfile | null, menuId: string): 
     }
     if (!allowed.includes('reports')) {
       allowed = [...allowed, 'reports'];
+    }
+    // Le menu Pièces a été séparé de Produits : garantir l'accès aux admins existants.
+    if (!allowed.includes('parts')) {
+      allowed = [...allowed, 'parts'];
     }
   }
   
@@ -221,7 +225,8 @@ function Sidebar({
     { id: 'repairs', name: 'Réparations', path: '/repairs', icon: Wrench },
     { id: 'reports', name: 'Rapports atelier', path: '/reports', icon: BarChart3 },
     { id: 'pos', name: 'Vente (POS)', path: '/pos', icon: ShoppingCart },
-    { id: 'products', name: 'Pièces & Produits', path: '/products', icon: Package },
+    { id: 'parts', name: 'Pièces détachées', path: '/parts', icon: Wrench },
+    { id: 'products', name: 'Produits', path: '/products', icon: Package },
     { id: 'clients', name: 'Clients', path: '/clients', icon: Users },
     { id: 'sales', name: 'Historique ventes', path: '/sales', icon: History },
     { id: 'invoices', name: 'Factures', path: '/invoices', icon: FileText },
@@ -830,7 +835,8 @@ export default function App() {
                 <Route path="/" element={hasMenuAccess(userProfile, 'dashboard') ? <Dashboard userProfile={userProfile} /> : <Navigate to={hasMenuAccess(userProfile, 'repairs') ? '/repairs' : (hasMenuAccess(userProfile, 'pos') ? '/pos' : (hasMenuAccess(userProfile, 'products') ? '/products' : (hasMenuAccess(userProfile, 'clients') ? '/clients' : (hasMenuAccess(userProfile, 'sales') ? '/sales' : (hasMenuAccess(userProfile, 'invoices') ? '/invoices' : '/settings')))))} replace />} />
                 <Route path="/repairs" element={hasMenuAccess(userProfile, 'repairs') ? <Repairs userProfile={userProfile} /> : <Navigate to="/" replace />} />
                 <Route path="/reports" element={hasMenuAccess(userProfile, 'reports') ? <RepairReports userProfile={userProfile} /> : <Navigate to="/" replace />} />
-                <Route path="/products" element={hasMenuAccess(userProfile, 'products') ? <Products userProfile={userProfile} /> : <Navigate to="/" replace />} />
+                <Route path="/parts" element={hasMenuAccess(userProfile, 'parts') ? <Products userProfile={userProfile} mode="part" /> : <Navigate to="/" replace />} />
+                <Route path="/products" element={hasMenuAccess(userProfile, 'products') ? <Products userProfile={userProfile} mode="product" /> : <Navigate to="/" replace />} />
                 <Route path="/clients" element={hasMenuAccess(userProfile, 'clients') ? <Clients userProfile={userProfile} /> : <Navigate to="/" replace />} />
                 <Route path="/pos" element={hasMenuAccess(userProfile, 'pos') ? <POS userProfile={userProfile} /> : <Navigate to="/" replace />} />
                 <Route path="/sales" element={hasMenuAccess(userProfile, 'sales') ? <Sales userProfile={userProfile} /> : <Navigate to="/" replace />} />
