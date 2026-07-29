@@ -94,3 +94,18 @@ export function decodeAzertyBarcode(str: string): string {
   return finalDigits;
 }
 
+
+/**
+ * Détermine si un article est une PIÈCE détachée (usage atelier) plutôt qu'un
+ * PRODUIT vendable en caisse.
+ *
+ * Priorité au drapeau explicite `isPart`. Pour les articles créés avant la
+ * séparation des menus (où `isPart` n'était pas enregistré), on retombe sur un
+ * heuristique : la présence d'une référence ou de modèles compatibles indique
+ * une pièce détachée.
+ */
+export function isSparePart(p: { isPart?: boolean; reference?: string; compatibleModels?: string } | null | undefined): boolean {
+  if (!p) return false;
+  if (typeof p.isPart === 'boolean') return p.isPart;
+  return Boolean((p.reference && p.reference.trim()) || (p.compatibleModels && p.compatibleModels.trim()));
+}
