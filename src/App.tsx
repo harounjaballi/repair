@@ -173,6 +173,14 @@ export function hasMenuAccess(userProfile: UserProfile | null, menuId: string): 
     if (!allowed.includes('users')) {
       allowed = [...allowed, 'users'];
     }
+    // Filet de sécurité pour les comptes admin créés avant l'ajout de l'atelier :
+    // les menus Réparations et Rapports atelier sont toujours accessibles.
+    if (!allowed.includes('repairs')) {
+      allowed = [...allowed, 'repairs'];
+    }
+    if (!allowed.includes('reports')) {
+      allowed = [...allowed, 'reports'];
+    }
   }
   
   // Admin-only failsafe for user manager menu
