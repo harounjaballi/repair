@@ -133,9 +133,11 @@ export default function Expenses({ userProfile }: ExpensesProps) {
         });
       }
       closeModal();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erreur enregistrement dépense:', err);
-      setErrorMsg("Erreur d'enregistrement. Vérifiez votre connexion et réessayez.");
+      const code = err?.code ? ` [${err.code}]` : '';
+      const detail = err?.message ? ` ${err.message}` : '';
+      setErrorMsg(`Erreur d'enregistrement${code}.${detail}`);
     } finally {
       setIsSubmitting(false);
     }
