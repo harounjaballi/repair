@@ -1706,18 +1706,31 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         </div>
       )}
 
-      {/* Étiquette autocollante code-barres (impression) — format 50 × 30 mm */}
+      {/* Étiquette autocollante code-barres (impression) — format 50 × 30 mm.
+          La page est déclarée en portrait 30×50 (sens du rouleau) et le contenu
+          pivoté de 90° : évite la rotation automatique du pilote qui faisait
+          sortir l'étiquette inversée et à cheval sur 2 étiquettes. */}
       {printingLabel && createPortal(
         <div className="print-container">
           <style>{`
             @media print {
-              @page { size: 50mm 30mm; margin: 0 !important; }
+              @page { size: 30mm 50mm; margin: 0 !important; }
             }
             .barcode-label-print svg{max-width:100%;height:auto;display:block;margin:0 auto}
           `}</style>
           <div
             className="barcode-label-print bg-white text-black font-sans"
-            style={{ width: '50mm', height: '30mm', margin: 0, textAlign: 'center', padding: '1mm 1.5mm 0', boxSizing: 'border-box', overflow: 'hidden' }}
+            style={{
+              width: '50mm',
+              height: '30mm',
+              margin: 0,
+              textAlign: 'center',
+              padding: '1mm 1.5mm 0',
+              boxSizing: 'border-box',
+              overflow: 'hidden',
+              transformOrigin: 'top left',
+              transform: 'translateX(30mm) rotate(90deg)'
+            }}
           >
             <div style={{ fontWeight: 900, fontSize: '13px', letterSpacing: '0.5px', lineHeight: 1.1 }}>SmarTECH</div>
             <div style={{ fontSize: '10px', fontWeight: 700, lineHeight: 1.1, marginTop: '0.5mm', wordBreak: 'break-word', maxHeight: '7mm', overflow: 'hidden' }}>{printingLabel.name || '—'}</div>
