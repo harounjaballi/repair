@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDocs, where, getDocFromServer } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Product, Category, StoreSettings, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
-import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp, Printer } from 'lucide-react';
 import { cn, decodeAzertyBarcode, isSparePart, isService } from '../lib/utils';
+import { Barcode as BarcodeLabel } from './Barcode';
 
 interface ProductsProps {
   userProfile: UserProfile | null;
@@ -163,6 +165,19 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
 
   const [buyPriceInput, setBuyPriceInput] = useState('');
   const [sellPriceInput, setSellPriceInput] = useState('');
+
+  // Impression d'une étiquette autocollante avec le code-barres du produit :
+  // ligne 1 = SmarTECH, ligne 2 = nom du produit, ligne 3 = code-barres.
+  // Utilise le même mécanisme .print-container (portal) que les tickets.
+  const [printingLabel, setPrintingLabel] = useState<{ name: string; barcode: string } | null>(null);
+  const printBarcodeLabel = () => {
+    if (!formData.barcode) return;
+    setPrintingLabel({ name: formData.name, barcode: formData.barcode });
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => setPrintingLabel(null), 500);
+    }, 150);
+  };
   // Case « C'est un service » : masque prix d'achat / stock / alerte et
   // n'enregistre ni dépense ni mouvement de stock.
   const [isServiceForm, setIsServiceForm] = useState(false);
@@ -1007,7 +1022,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         placeholder="Pointez votre douchette et flashez, ou tapez ici..."
                         value={formData.barcode}
                         onChange={(e) => setFormData({ ...formData, barcode: decodeAzertyBarcode(e.target.value) })}
-                        className="w-full pl-11 pr-24 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white text-xs font-bold font-mono text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all duration-300"
+                        className="w-full pl-11 pr-36 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white text-xs font-bold font-mono text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all duration-300"
                       />
                       <div className="absolute inset-y-1.5 right-1.5 flex items-center gap-1">
                         <button
@@ -1021,6 +1036,20 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                           title="Générer un code-barres aléatoire commençant par 619 Tunisie"
                         >
                           Générer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={printBarcodeLabel}
+                          disabled={!formData.barcode}
+                          className={cn(
+                            "h-full px-2.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-colors border flex items-center gap-1",
+                            formData.barcode
+                              ? "bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border-indigo-100 cursor-pointer"
+                              : "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
+                          )}
+                          title="Imprimer l'étiquette autocollante avec le code-barres"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -1674,6 +1703,20 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
             </div>
           </div>
         </div>
+      )}
+
+      {/* Étiquette autocollante code-barres (impression) */}
+      {printingLabel && createPortal(
+        <div className="print-container">
+          <div className="w-[50mm] mx-auto bg-white text-black text-center pt-2 px-1 font-sans">
+            <div className="font-black text-[15px] tracking-wide leading-none">SmarTECH</div>
+            <div className="text-[11px] font-bold leading-tight mt-1 break-words">{printingLabel.name || '—'}</div>
+            <div className="mt-1 flex justify-center">
+              <BarcodeLabel value={printingLabel.barcode} height={34} moduleWidth={1.3} />
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
