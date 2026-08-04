@@ -1706,14 +1706,23 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         </div>
       )}
 
-      {/* Étiquette autocollante code-barres (impression) */}
+      {/* Étiquette autocollante code-barres (impression) — format 50 × 30 mm */}
       {printingLabel && createPortal(
         <div className="print-container">
-          <div className="w-[50mm] mx-auto bg-white text-black text-center pt-2 px-1 font-sans">
-            <div className="font-black text-[15px] tracking-wide leading-none">SmarTECH</div>
-            <div className="text-[11px] font-bold leading-tight mt-1 break-words">{printingLabel.name || '—'}</div>
-            <div className="mt-1 flex justify-center">
-              <BarcodeLabel value={printingLabel.barcode} height={34} moduleWidth={1.3} />
+          <style>{`
+            @media print {
+              @page { size: 50mm 30mm; margin: 0 !important; }
+            }
+            .barcode-label-print svg{max-width:100%;height:auto;display:block;margin:0 auto}
+          `}</style>
+          <div
+            className="barcode-label-print bg-white text-black font-sans"
+            style={{ width: '50mm', height: '30mm', margin: 0, textAlign: 'center', padding: '1mm 1.5mm 0', boxSizing: 'border-box', overflow: 'hidden' }}
+          >
+            <div style={{ fontWeight: 900, fontSize: '13px', letterSpacing: '0.5px', lineHeight: 1.1 }}>SmarTECH</div>
+            <div style={{ fontSize: '10px', fontWeight: 700, lineHeight: 1.1, marginTop: '0.5mm', wordBreak: 'break-word', maxHeight: '7mm', overflow: 'hidden' }}>{printingLabel.name || '—'}</div>
+            <div style={{ marginTop: '0.5mm' }}>
+              <BarcodeLabel value={printingLabel.barcode} height={30} moduleWidth={1.2} />
             </div>
           </div>
         </div>,
