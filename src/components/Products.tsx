@@ -1022,7 +1022,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         placeholder="Pointez votre douchette et flashez, ou tapez ici..."
                         value={formData.barcode}
                         onChange={(e) => setFormData({ ...formData, barcode: decodeAzertyBarcode(e.target.value) })}
-                        className="w-full pl-11 pr-36 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white text-xs font-bold font-mono text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all duration-300"
+                        className="w-full pl-11 pr-44 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white text-xs font-bold font-mono text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all duration-300"
                       />
                       <div className="absolute inset-y-1.5 right-1.5 flex items-center gap-1">
                         <button
@@ -1050,6 +1050,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                           title="Imprimer l'étiquette autocollante avec le code-barres"
                         >
                           <Printer className="w-3.5 h-3.5" />
+                          Imprimer
                         </button>
                       </div>
                     </div>
