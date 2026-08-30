@@ -1040,7 +1040,9 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[calc(100vh-24px)] sm:max-h-[85vh] overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-150">
             <div className="flex-shrink-0 px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <h2 className="text-lg font-bold text-gray-900">
-                {editingProduct ? 'Modifier Produit' : 'Nouveau Produit'}
+                {isPartMode
+                  ? (editingProduct ? 'Modifier la Pièce' : 'Nouvelle Pièce')
+                  : (editingProduct ? 'Modifier Produit' : 'Nouveau Produit')}
               </h2>
               <button onClick={closeModal} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
                 <X className="w-5 h-5" />
@@ -1056,8 +1058,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nom du produit</label>
+                  <div className={cn("col-span-2", isPartMode && "order-2")}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{isPartMode ? 'Description' : 'Nom du produit'}</label>
                     <input
                       type="text"
                       required
@@ -1068,7 +1070,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   </div>
 
                   {isPartMode && (
-                    <div className="col-span-2">
+                    <div className="col-span-2 order-3">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Marque</label>
                       <div className="flex gap-2">
                         <select
@@ -1099,10 +1101,10 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                     </div>
                   )}
 
-                  <div className="col-span-2 space-y-2">
+                  <div className={cn("col-span-2 space-y-2", isPartMode && "order-1")}>
                     <div className="flex items-center justify-between">
                       <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
-                        Code à barre / Référence
+                        {isPartMode ? 'Référence / Code à barre' : 'Code à barre / Référence'}
                       </label>
                       <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -1164,7 +1166,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                     </p>
                   </div>
 
-                  <div className="col-span-2">
+                  <div className={cn("col-span-2", isPartMode && "order-4")}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
                     <div className="flex gap-2">
                       <select
@@ -1212,7 +1214,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   )}
 
                   {!isServiceForm && (
-                  <div>
+                  <div className={cn(isPartMode && "order-5")}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Stock Initial</label>
                     <input
                       type="number"
@@ -1226,7 +1228,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   )}
 
                   {!isServiceForm && (
-                  <div>
+                  <div className={cn(isPartMode && "order-6")}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Alerte Stock Faible</label>
                     <input
                       type="number"
@@ -1239,7 +1241,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   )}
 
                   {!isServiceForm && (
-                  <div>
+                  <div className={cn(isPartMode && "order-7")}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Prix Achat ({storeSettings?.currency || 'DT'})</label>
                     <input
                       type="text"
@@ -1266,7 +1268,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   </div>
                   )}
 
-                  <div className={isServiceForm ? 'col-span-2' : ''}>
+                  <div className={cn(isServiceForm ? 'col-span-2' : '', isPartMode && "order-8")}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Prix Vente ({storeSettings?.currency || 'DT'})</label>
                     <input
                       type="text"
@@ -1292,7 +1294,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                     />
                   </div>
 
-                  {!isServiceForm && (
+                  {!isServiceForm && !isPartMode && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Référence pièce</label>
                     <input
@@ -1305,7 +1307,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   </div>
                   )}
                   {!isServiceForm && (
-                  <div>
+                  <div className={cn(isPartMode && "col-span-2 order-9")}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Modèles compatibles</label>
                     <input
                       type="text"
