@@ -144,6 +144,13 @@ service cloud.firestore {
       allow delete: if hasAccess(resource.data.ownerId);
     }
 
+    match /brands/{brandId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
     match /settings/{settingId} {
       allow read, write: if isAuthenticated() && (
         isAdmin() ||
