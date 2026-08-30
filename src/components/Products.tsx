@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDocs, where, getDocFromServer } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Product, Category, StoreSettings, UserProfile } from '../types';
+import { Product, Category, Brand, StoreSettings, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
 import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp, Printer } from 'lucide-react';
 import { cn, decodeAzertyBarcode, isSparePart, isService } from '../lib/utils';
@@ -19,6 +19,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
   const isPartMode = mode === 'part';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,6 +27,9 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isQuickCategoryModalOpen, setIsQuickCategoryModalOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [isQuickBrandModalOpen, setIsQuickBrandModalOpen] = useState(false);
+  const [newBrandName, setNewBrandName] = useState('');
+  const [deletingBrandId, setDeletingBrandId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanned' | 'error'>('idle');
   const [scanMessage, setScanMessage] = useState('');
@@ -154,6 +158,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
   const [formData, setFormData] = useState({
     name: '',
     category: '',
+    brand: '',
     buyPrice: 0,
     sellPrice: 0,
     barcode: '',
@@ -209,6 +214,14 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       handleFirestoreError(error, OperationType.LIST, 'categories');
     });
 
+    const unsubscribeBrands = onSnapshot(query(collection(db, 'brands'), where('ownerId', '==', ownerId)), (snapshot) => {
+      const brs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Brand));
+      brs.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setBrands(brs);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'brands');
+    });
+
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', ownerId), (snapshot) => {
       if (snapshot.exists()) {
         setStoreSettings(snapshot.data() as StoreSettings);
@@ -220,6 +233,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     return () => {
       unsubscribeProds();
       unsubscribeCats();
+      unsubscribeBrands();
       unsubscribeSettings();
     };
   }, [ownerId]);
@@ -601,6 +615,19 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     }
   };
 
+  const executeBrandDelete = async (brandId: string, brandName: string) => {
+    try {
+      await deleteDoc(doc(db, 'brands', brandId));
+      if (formData.brand === brandName) {
+        const remaining = brands.filter(b => b.id !== brandId);
+        setFormData(prev => ({ ...prev, brand: remaining[0]?.name || '' }));
+      }
+      setDeletingBrandId(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'brands');
+    }
+  };
+
   const openModal = (product?: Product) => {
     setErrorMsg(null);
     if (product) {
@@ -608,6 +635,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       setFormData({
         name: product.name,
         category: product.category,
+        brand: product.brand || '',
         buyPrice: product.buyPrice,
         sellPrice: product.sellPrice,
         barcode: product.barcode || '',
@@ -624,6 +652,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       setFormData({
         name: '',
         category: categories[0]?.name || 'produit',
+        brand: isPartMode ? (brands[0]?.name || '') : '',
         buyPrice: 0,
         sellPrice: 0,
         barcode: '',
@@ -718,6 +747,42 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         alert("Vérifiez votre connexion Internet.");
       } else {
         handleFirestoreError(error, OperationType.CREATE, 'categories');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleQuickBrandAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBrandName.trim()) return;
+
+    // Empêche un second envoi tant que le premier n'est pas terminé (évite les doublons)
+    if (isSubmitting) return;
+
+    const exists = brands.some(b => b.name.toLowerCase() === newBrandName.trim().toLowerCase());
+    if (exists) {
+      alert('Cette marque existe déjà.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      // Vérifie une vraie connexion serveur AVANT d'écrire.
+      await ensureOnline();
+
+      await addDoc(collection(db, 'brands'), {
+        name: newBrandName.trim(),
+        ownerId
+      });
+      setFormData(prev => ({ ...prev, brand: newBrandName.trim() }));
+      setNewBrandName('');
+    } catch (error: any) {
+      if (error?.message === 'OFFLINE') {
+        alert("Vérifiez votre connexion Internet.");
+      } else {
+        handleFirestoreError(error, OperationType.CREATE, 'brands');
       }
     } finally {
       setIsSubmitting(false);
@@ -1001,6 +1066,38 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                     />
                   </div>
+
+                  {isPartMode && (
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Marque</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={formData.brand}
+                          onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                          className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-800 bg-white"
+                        >
+                          {brands.length === 0 ? (
+                            <option value="">Aucune marque — cliquez sur + pour en créer une</option>
+                          ) : (
+                            <>
+                              <option value="">-- Choisir une marque --</option>
+                              {brands.map(b => (
+                                <option key={b.id} value={b.name}>{b.name}</option>
+                              ))}
+                            </>
+                          )}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setIsQuickBrandModalOpen(true)}
+                          className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors cursor-pointer"
+                          title="Ajouter une marque"
+                        >
+                          <Plus className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="col-span-2 space-y-2">
                     <div className="flex items-center justify-between">
@@ -1353,6 +1450,119 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                 onClick={() => {
                   setDeletingCatId(null);
                   setIsQuickCategoryModalOpen(false);
+                }}
+                className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Brand Modal */}
+      {isQuickBrandModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <h2 className="text-base font-black text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                <Tag className="w-4 h-4 text-indigo-500 animate-pulse" />
+                Gérer les Marques
+              </h2>
+              <button onClick={() => setIsQuickBrandModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Add form */}
+              <form onSubmit={handleQuickBrandAdd} className="space-y-2">
+                <label className="block text-xs font-black uppercase tracking-wider text-slate-600">Nouveau nom de marque</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    autoFocus
+                    required
+                    value={newBrandName}
+                    onChange={(e) => setNewBrandName(e.target.value)}
+                    className="flex-1 px-3.5 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-xs font-semibold placeholder:text-slate-400 bg-slate-50 focus:bg-white transition-all text-slate-900"
+                    placeholder="Ex: Samsung, Apple, Xiaomi..."
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-indigo-600/10 cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Ajouter
+                  </button>
+                </div>
+              </form>
+
+              {/* List of existing brands */}
+              <div className="space-y-2.5">
+                <span className="block text-xs font-black uppercase tracking-wider text-slate-600 border-b border-slate-100 pb-1.5 mb-1">
+                  Marques existantes ({brands.length})
+                </span>
+
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  {brands.length === 0 ? (
+                    <p className="text-center py-6 text-slate-400 text-xs font-medium">Aucune marque enregistrée.</p>
+                  ) : (
+                    brands.map((b) => (
+                      <div key={b.id} className="flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100/50 border border-slate-100 rounded-xl transition-all group">
+                        {deletingBrandId === b.id ? (
+                          <div className="flex items-center justify-between w-full animate-in fade-in slide-in-from-right-1 duration-150">
+                            <span className="text-[11px] font-black text-red-600 uppercase tracking-wider flex items-center gap-1">
+                              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                              Supprimer?
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setDeletingBrandId(null)}
+                                className="px-2 py-1 text-[10px] font-bold text-slate-500 hover:text-slate-700 bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                              >
+                                Non
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => executeBrandDelete(b.id, b.name)}
+                                className="px-2.5 py-1 text-[10px] font-black text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all cursor-pointer"
+                              >
+                                Oui
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                              <Tag className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                              {b.name}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => setDeletingBrandId(b.id)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title={`Supprimer la marque ${b.name}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-3 border-t border-slate-50 bg-slate-50/50 flex justify-end items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeletingBrandId(null);
+                  setIsQuickBrandModalOpen(false);
                 }}
                 className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-black uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
               >
