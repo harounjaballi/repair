@@ -9,11 +9,19 @@ export interface Category {
   ownerId?: string;
 }
 
+// Marque d'une pièce détachée (ex: Samsung, Apple, Xiaomi...)
+export interface Brand {
+  id: string;
+  name: string;
+  ownerId?: string;
+}
+
 // Produit / pièce détachée / accessoire vendable et/ou stockable
 export interface Product {
   id: string;
   name: string;
   category: string;            // ID ou nom de catégorie
+  brand?: string;              // Marque (pièces détachées) — ex: Samsung, Apple...
   reference?: string;          // Référence pièce détachée
   compatibleModels?: string;   // Modèles compatibles (ex: "iPhone 11, 11 Pro")
   buyPrice: number;
