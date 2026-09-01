@@ -606,7 +606,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     try {
       await deleteDoc(doc(db, 'categories', categoryId));
       if (formData.category === categoryName) {
-        const remaining = categories.filter(c => c.id !== categoryId);
+        const remaining = scopedCategories.filter(c => c.id !== categoryId);
         setFormData(prev => ({ ...prev, category: remaining[0]?.name || '' }));
       }
       setDeletingCatId(null);
@@ -651,7 +651,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       setEditingProduct(null);
       setFormData({
         name: '',
-        category: categories[0]?.name || 'produit',
+        category: scopedCategories[0]?.name || (isPartMode ? 'piece' : 'produit'),
         brand: isPartMode ? (brands[0]?.name || '') : '',
         buyPrice: 0,
         sellPrice: 0,
@@ -737,7 +737,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
 
       await addDoc(collection(db, 'categories'), {
         name: newCategoryName.trim(),
-        type: 'autre',
+        type: isPartMode ? 'piece' : (isServiceForm ? 'service' : 'produit'),
         ownerId
       });
       setFormData(prev => ({ ...prev, category: newCategoryName.trim() }));
@@ -792,16 +792,16 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
   const handleResetDefaultCategories = async () => {
     if (!confirm('Voulez-vous restaurer les catégories de base par défaut ?')) return;
     const defaults = [
-      { id: 'cat_pieces', name: 'Pièces détachées' },
-      { id: 'cat_accessoires', name: 'Accessoires' },
-      { id: 'cat_produits', name: 'Produits' },
-      { id: 'cat_services', name: 'Services' }
+      { id: 'cat_pieces', name: 'Pièces détachées', type: 'piece' },
+      { id: 'cat_accessoires', name: 'Accessoires', type: 'accessoire' },
+      { id: 'cat_produits', name: 'Produits', type: 'produit' },
+      { id: 'cat_services', name: 'Services', type: 'service' }
     ];
     for (const cat of defaults) {
       try {
         await setDoc(doc(db, 'categories', cat.id + '_' + ownerId), {
           name: cat.name,
-          type: 'autre',
+          type: cat.type,
           ownerId
         });
       } catch (err) {
@@ -816,18 +816,50 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
   // Garantit que le filtre n'est jamais vide même si la collection `categories`
   // est vide ou que ses documents n'ont pas le bon ownerId.
   const normalizeCat = (s: string) => (s || '').trim().toLowerCase();
+
+  // Détermine le "type effectif" d'une catégorie (pièce vs produit/service) pour pouvoir
+  // séparer strictement les deux menus, même pour les catégories créées avant cette
+  // correction (dont le champ `type` valait 'autre' par défaut, faute de distinction) :
+  // 1. On fait confiance au champ `type` s'il est déjà correctement renseigné.
+  // 2. Sinon on reconnaît les catégories par défaut historiques par leur nom.
+  // 3. Sinon on regarde à quoi la catégorie sert réellement dans les produits existants.
+  const getEffectiveCategoryType = React.useCallback((c: Category): string => {
+    if (c.type && c.type !== 'autre') return c.type;
+    const key = normalizeCat(c.name);
+    if (key === normalizeCat('Pièces détachées')) return 'piece';
+    if (key === normalizeCat('Accessoires')) return 'accessoire';
+    if (key === normalizeCat('Produits')) return 'produit';
+    if (key === normalizeCat('Services')) return 'service';
+    const usedByPart = products.some(p => normalizeCat(p.category) === key && isSparePart(p));
+    const usedByProduct = products.some(p => normalizeCat(p.category) === key && !isSparePart(p));
+    if (usedByPart && !usedByProduct) return 'piece';
+    if (usedByProduct && !usedByPart) return 'produit';
+    return 'autre';
+  }, [products]);
+
+  // Catégories visibles dans le contexte actuel (Pièces détachées OU Produits/Services) :
+  // une catégorie de type 'piece' n'apparaît jamais côté Produits, et inversement.
+  // Les catégories ambiguës/neuves ('autre') restent visibles des deux côtés.
+  const scopedCategories = React.useMemo(
+    () => categories.filter(c => {
+      const t = getEffectiveCategoryType(c);
+      return isPartMode ? (t === 'piece' || t === 'autre') : (t !== 'piece');
+    }),
+    [categories, isPartMode, getEffectiveCategoryType]
+  );
+
   const filterCategories = React.useMemo(() => {
     const map = new Map<string, string>();
-    categories.forEach(c => {
+    scopedCategories.forEach(c => {
       const key = normalizeCat(c.name);
       if (key && !map.has(key)) map.set(key, c.name.trim());
     });
-    products.forEach(p => {
+    products.filter(p => isSparePart(p) === isPartMode).forEach(p => {
       const key = normalizeCat(p.category);
       if (key && !map.has(key)) map.set(key, (p.category || '').trim());
     });
     return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
-  }, [categories, products]);
+  }, [scopedCategories, products, isPartMode]);
 
   const filteredProducts = products.filter(p => {
     const matchesMode = isSparePart(p) === isPartMode;
@@ -1175,12 +1207,12 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-800 bg-white"
                         required
                       >
-                        {categories.length === 0 ? (
+                        {scopedCategories.length === 0 ? (
                           <option value="">⚠️ Veuillez créer une catégorie</option>
                         ) : (
                           <>
                             <option value="">-- Choisir une catégorie --</option>
-                            {categories.map(cat => (
+                            {scopedCategories.map(cat => (
                               <option key={cat.id} value={cat.name}>{cat.name}</option>
                             ))}
                           </>
@@ -1382,14 +1414,14 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
               {/* List of existing categories */}
               <div className="space-y-2.5">
                 <span className="block text-xs font-black uppercase tracking-wider text-slate-600 border-b border-slate-100 pb-1.5 mb-1">
-                  Catégories existantes ({categories.length})
+                  Catégories existantes ({scopedCategories.length})
                 </span>
                 
                 <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                  {categories.length === 0 ? (
+                  {scopedCategories.length === 0 ? (
                     <p className="text-center py-6 text-slate-400 text-xs font-medium">Aucune catégorie enregistrée.</p>
                   ) : (
-                    categories.map((cat) => (
+                    scopedCategories.map((cat) => (
                       <div key={cat.id} className="flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100/50 border border-slate-100 rounded-xl transition-all group">
                         {deletingCatId === cat.id ? (
                           <div className="flex items-center justify-between w-full animate-in fade-in slide-in-from-right-1 duration-150">
