@@ -136,6 +136,7 @@ export interface Repair {
   total: number;
   paid: number;
   debt: number;
+  discount?: number;
 
   warrantyDays?: number;
   warrantyUntil?: string;
