@@ -213,7 +213,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
   const [loading, setLoading] = useState(true);
 
   // States for detailed history modal
-  const [activeModal, setActiveModal] = useState<'revenue' | 'profit' | 'debt' | 'sales' | 'expenses' | 'stock' | null>(null);
+  const [activeModal, setActiveModal] = useState<'revenue' | 'profit' | 'debt' | 'sales' | 'expenses' | 'stock' | 'repairProfit' | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [periodFilter, setPeriodFilter] = useState<'7' | '30' | '90' | '100' | 'all' | 'custom'>('100');
   const [startDate, setStartDate] = useState('');
@@ -488,6 +488,52 @@ export default function Dashboard({ userProfile }: DashboardProps) {
 
     return Object.values(dailyMap).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
   }, [expenses]);
+
+  // Regroupe le BÉNÉFICE DES RÉPARATIONS (livrées) par jour pour l'historique dédié.
+  // Bénéfice = total facturé de la réparation - coût d'achat des pièces utilisées
+  // (la main d'œuvre est considérée comme 100% bénéfice, sans coût de revient suivi).
+  const dailyRepairRecords = useMemo(() => {
+    const dailyMap: Record<string, {
+      dateStr: string;
+      dateObj: Date;
+      count: number;
+      revenue: number;
+      partsCost: number;
+      profit: number;
+    }> = {};
+
+    repairs.filter((r: any) => r.status === 'livre').forEach((r: any) => {
+      const src = r.deliveredAt || r.date;
+      let d: Date;
+      if (!src) d = new Date();
+      else if (typeof src.toDate === 'function') d = src.toDate();
+      else d = new Date(src);
+
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dayKey = `${year}-${month}-${day}`;
+
+      if (!dailyMap[dayKey]) {
+        dailyMap[dayKey] = { dateStr: dayKey, dateObj: d, count: 0, revenue: 0, partsCost: 0, profit: 0 };
+      }
+
+      const partsCost = (r.parts || []).reduce((s: number, p: any) => s + (p.unitBuyPrice || 0) * (p.quantity || 0), 0);
+      const revenue = r.total || 0;
+      const rec = dailyMap[dayKey];
+      rec.count += 1;
+      rec.revenue += revenue;
+      rec.partsCost += partsCost;
+      rec.profit += (revenue - partsCost);
+    });
+
+    return Object.values(dailyMap).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+  }, [repairs]);
+
+  const repairProfitTotal = useMemo(
+    () => dailyRepairRecords.reduce((s, r) => s + r.profit, 0),
+    [dailyRepairRecords]
+  );
 
   // Handle Search & Filter & Sorter for the Active Historical Data
   const filteredAndSortedRecords = useMemo(() => {
@@ -916,15 +962,29 @@ export default function Dashboard({ userProfile }: DashboardProps) {
           { label: 'Prêts à récupérer', value: ready, color: 'from-emerald-500 to-emerald-600' },
           { label: 'En attente de pièces', value: waiting, color: 'from-amber-500 to-amber-600' },
           { label: 'Réparations impayées', value: `${unpaid.toFixed(2)} ${cur}`, color: 'from-rose-500 to-rose-600' },
+          { label: 'Bénéfice réparations', value: `${repairProfitTotal.toFixed(2)} ${cur}`, color: 'from-teal-500 to-cyan-600', onClick: () => setActiveModal('repairProfit') },
         ];
         return (
           <div>
             <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3">Atelier de réparation</p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-              {cards.map((c, i) => (
-                <div key={i} className={cn("rounded-2xl p-4 text-white bg-gradient-to-br shadow-lg", c.color)}>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+              {cards.map((c: any, i) => (
+                <div
+                  key={i}
+                  onClick={c.onClick}
+                  className={cn(
+                    "rounded-2xl p-4 text-white bg-gradient-to-br shadow-lg",
+                    c.color,
+                    c.onClick && "cursor-pointer hover:scale-[1.03] active:scale-[0.98] transition-transform"
+                  )}
+                >
                   <p className="text-2xl font-black font-display">{c.value}</p>
                   <p className="text-[11px] font-bold uppercase tracking-wider opacity-90 mt-0.5">{c.label}</p>
+                  {c.onClick && (
+                    <p className="text-[9px] font-bold text-white/70 mt-1.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3 shrink-0" /> Historique
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -2073,6 +2133,111 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         </div>
       )}
 
+      {/* MODAL HISTORIQUE : BÉNÉFICE RÉPARATIONS */}
+      {activeModal === 'repairProfit' && (
+        <div
+          onClick={() => setActiveModal(null)}
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 cursor-default"
+          >
+            {/* Modal Header */}
+            <div className="p-6 text-white bg-gradient-to-r from-teal-550 via-teal-600 to-cyan-750 flex items-center justify-between relative overflow-hidden shrink-0">
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 to-transparent"></div>
+              <div className="relative z-10 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-xs">
+                  <Coins className="w-5 h-5 text-teal-50" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight leading-none">
+                    Consulter l'Historique : Bénéfice Réparations
+                  </h3>
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-white/70 mt-1">
+                    Total facturé des réparations livrées, hors coût des pièces utilisées
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActiveModal(null)}
+                className="relative z-10 px-4 py-2 flex items-center gap-2 bg-white/15 hover:bg-white/25 rounded-xl transition-all cursor-pointer text-white text-xs font-black uppercase tracking-wider"
+              >
+                <X className="w-4 h-4" />
+                <span>Fermer</span>
+              </button>
+            </div>
+
+            {/* Modal Table Content */}
+            <div className="overflow-y-auto grow font-sans p-6">
+              {dailyRepairRecords.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-450 border border-slate-100 mb-2">
+                    <AlertCircle className="w-5 h-5 text-slate-400" />
+                  </div>
+                  <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Aucune réparation livrée</h4>
+                  <p className="text-slate-450 text-[11px] mt-1">Le bénéfice apparaîtra ici dès qu'une réparation sera marquée « Livrée ».</p>
+                </div>
+              ) : (
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-150 text-[10px] font-black uppercase tracking-wider text-slate-450 bg-slate-50/70">
+                      <th className="px-6 py-3">Date</th>
+                      <th className="px-6 py-3 text-center">Réparations livrées</th>
+                      <th className="px-6 py-3 text-right">Total facturé</th>
+                      <th className="px-6 py-3 text-right">Coût des pièces</th>
+                      <th className="px-6 py-3 text-right">Bénéfice</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {dailyRepairRecords.map((rec) => {
+                      const formattedDate = rec.dateObj.toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+                      return (
+                        <tr key={rec.dateStr} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-3.5 whitespace-nowrap font-bold text-slate-700 capitalize">
+                            {formattedDate}
+                          </td>
+                          <td className="px-6 py-3.5 text-center font-bold text-slate-600 font-mono">
+                            {rec.count}
+                          </td>
+                          <td className="px-6 py-3.5 text-right font-mono text-slate-600">
+                            {rec.revenue.toFixed(3)} {currency}
+                          </td>
+                          <td className="px-6 py-3.5 text-right font-mono text-slate-400">
+                            {rec.partsCost.toFixed(3)} {currency}
+                          </td>
+                          <td className="px-6 py-3.5 text-right whitespace-nowrap">
+                            <span className="px-3 py-1 bg-teal-50 text-teal-700 font-black font-mono rounded-lg border border-teal-100 text-xs">
+                              {rec.profit.toFixed(3)} {currency}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 font-sans">
+              <div className="text-xs font-bold text-slate-450 block uppercase tracking-wide">
+                Total : {repairProfitTotal.toFixed(3)} {currency} sur {dailyRepairRecords.reduce((s, r) => s + r.count, 0)} réparation(s) livrée(s)
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer transition-all active:scale-[0.98] border border-slate-200 shadow-xs"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Retour au Tableau de bord
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SUB-MODAL FOR MODIFYING SUPPLY INPUT */}
       {editingSupply && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -2146,7 +2311,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       )}
 
       {/* RENDER INVISIBLE PRINTABLE REPORT VIA REACT PORTAL */}
-      {activeModal && activeModal !== 'expenses' && createPortal(
+      {activeModal && activeModal !== 'expenses' && activeModal !== 'repairProfit' && createPortal(
         <PrintableReport 
           activeModal={activeModal} 
           records={activeModal === 'stock' ? filteredAndSortedProducts : filteredAndSortedRecords} 
