@@ -311,6 +311,8 @@ export default function Repairs({ userProfile }: RepairsProps) {
           canDelete={userProfile?.role === 'admin'}
           currentUserLabel={currentUserLabel}
           settings={settings}
+          ownerId={ownerId}
+          clients={clients}
           onEdit={() => { setEditingRepair(detailRepair); setDetailRepair(null); setIsFormOpen(true); }}
           onClose={() => setDetailRepair(null)}
           onDelete={() => handleDelete(detailRepair)}
@@ -708,7 +710,7 @@ function Field({ label, value, onChange, placeholder, type = 'text', full = fals
 //  DÉTAIL RÉPARATION + suivi + changement rapide de statut
 // ============================================================
 function RepairDetail({
-  repair, currency, canDelete, currentUserLabel, settings,
+  repair, currency, canDelete, currentUserLabel, settings, ownerId, clients,
   onEdit, onClose, onDelete, onError, onSuccess
 }: {
   repair: Repair;
@@ -716,6 +718,8 @@ function RepairDetail({
   canDelete: boolean;
   currentUserLabel: string;
   settings: StoreSettings | null;
+  ownerId: string;
+  clients: Client[];
   onEdit: () => void;
   onClose: () => void;
   onDelete: () => void;
@@ -724,19 +728,20 @@ function RepairDetail({
 }) {
   const [quickNote, setQuickNote] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [showDeliveryCaisse, setShowDeliveryCaisse] = useState(false);
+
+  const repairClient = clients.find(c => c.id === repair.clientId) || null;
 
   const changeStatus = async (newStatus: RepairStatus) => {
     if (newStatus === repair.status && !quickNote.trim()) return;
+    // La livraison passe systématiquement par la caisse (encaissement/remise/crédit).
+    if (newStatus === 'livre' && repair.status !== 'livre') {
+      setShowDeliveryCaisse(true);
+      return;
+    }
     setUpdating(true);
     try {
       const now = new Date().toISOString();
-      let warrantyUntil = repair.warrantyUntil;
-      let deliveredAt = repair.deliveredAt;
-      if (newStatus === 'livre' && repair.status !== 'livre') {
-        deliveredAt = now;
-        const days = repair.warrantyDays || settings?.defaultWarrantyDays || 0;
-        if (days > 0) { const d = new Date(); d.setDate(d.getDate() + days); warrantyUntil = d.toISOString(); }
-      }
       const log: RepairLog = {
         date: now,
         status: newStatus !== repair.status ? newStatus : undefined,
@@ -745,14 +750,63 @@ function RepairDetail({
       };
       await updateDoc(doc(db, 'repairs', repair.id), {
         status: newStatus,
-        warrantyUntil: warrantyUntil || null,
-        deliveredAt: deliveredAt || null,
         logs: [...(repair.logs || []), log],
       });
       setQuickNote('');
       onSuccess(`Statut mis à jour : ${REPAIR_STATUS_LABELS[newStatus]}`);
     } catch (e: any) {
       onError("Échec de la mise à jour : " + (e.message || e));
+    } finally { setUpdating(false); }
+  };
+
+  // Confirmation de la livraison depuis la fenêtre de caisse : encaissement + remise,
+  // avec possibilité de créditer le reste au compte du client au lieu de le garder comme
+  // dette sur la fiche de réparation.
+  const confirmDelivery = async (paidNow: number, discount: number, creditRest: boolean) => {
+    setUpdating(true);
+    try {
+      const now = new Date().toISOString();
+      const days = repair.warrantyDays || settings?.defaultWarrantyDays || 0;
+      let warrantyUntil = repair.warrantyUntil;
+      if (days > 0) { const d = new Date(); d.setDate(d.getDate() + days); warrantyUntil = d.toISOString(); }
+
+      const dueAfterDiscount = Math.max(0, Math.round((repair.debt - discount) * 1000) / 1000);
+      const restAfterPaidNow = Math.max(0, Math.round((dueAfterDiscount - paidNow) * 1000) / 1000);
+      const newTotal = Math.max(0, Math.round((repair.total - discount) * 1000) / 1000);
+      const newPaid = Math.round((repair.paid + paidNow) * 1000) / 1000;
+      const newDebt = creditRest ? 0 : restAfterPaidNow;
+
+      let note = `Livré — Encaissé ${paidNow.toFixed(3)} ${currency}`;
+      if (discount > 0) note += `, remise ${discount.toFixed(3)} ${currency}`;
+      if (creditRest && restAfterPaidNow > 0) note += `, ${restAfterPaidNow.toFixed(3)} ${currency} crédités au compte de ${repairClient?.name || 'client'}`;
+
+      const log: RepairLog = { date: now, status: 'livre', note, by: currentUserLabel };
+      const logs = [...(repair.logs || []), log];
+
+      if (creditRest && restAfterPaidNow > 0) {
+        if (!repairClient) throw new Error("Sélectionnez un client sur la fiche pour pouvoir créditer le reste dû.");
+        await runTransaction(db, async (tx) => {
+          const clientRef = doc(db, 'clients', repairClient.id);
+          const clientSnap = await tx.get(clientRef);
+          if (!clientSnap.exists()) throw new Error('Client introuvable');
+          const currentClientDebt = clientSnap.data().debt || 0;
+          tx.update(doc(db, 'repairs', repair.id), {
+            status: 'livre', deliveredAt: now, warrantyUntil: warrantyUntil || null,
+            total: newTotal, paid: newPaid, debt: newDebt, discount, logs,
+          });
+          tx.update(clientRef, { debt: currentClientDebt + restAfterPaidNow });
+        });
+      } else {
+        await updateDoc(doc(db, 'repairs', repair.id), {
+          status: 'livre', deliveredAt: now, warrantyUntil: warrantyUntil || null,
+          total: newTotal, paid: newPaid, debt: newDebt, discount, logs,
+        });
+      }
+
+      setShowDeliveryCaisse(false);
+      onSuccess('Réparation livrée et encaissement enregistré.');
+    } catch (e: any) {
+      onError("Échec de l'encaissement : " + (e.message || e));
     } finally { setUpdating(false); }
   };
 
@@ -889,6 +943,128 @@ function RepairDetail({
         </div>,
         document.body
       )}
+
+      {showDeliveryCaisse && (
+        <DeliveryCaisseModal
+          repair={repair}
+          client={repairClient}
+          currency={currency}
+          updating={updating}
+          onClose={() => setShowDeliveryCaisse(false)}
+          onConfirm={confirmDelivery}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+//  FENÊTRE DE CAISSE À LA LIVRAISON (encaissement, remise, crédit client)
+// ============================================================
+function DeliveryCaisseModal({
+  repair, client, currency, updating, onClose, onConfirm
+}: {
+  repair: Repair;
+  client: Client | null;
+  currency: string;
+  updating: boolean;
+  onClose: () => void;
+  onConfirm: (paidNow: number, discount: number, creditRest: boolean) => void;
+}) {
+  const [discountInput, setDiscountInput] = useState('0');
+  const [paidInput, setPaidInput] = useState(repair.debt.toFixed(3));
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const discount = Math.max(0, parseFloat(discountInput.replace(',', '.')) || 0);
+  const dueAfterDiscount = Math.max(0, Math.round((repair.debt - discount) * 1000) / 1000);
+  const paidNow = Math.max(0, parseFloat(paidInput.replace(',', '.')) || 0);
+  const restDue = Math.max(0, Math.round((dueAfterDiscount - paidNow) * 1000) / 1000);
+
+  const handleEncaisser = () => {
+    if (discount > repair.debt + 0.001) { setFormError("La remise ne peut pas dépasser le reste dû."); return; }
+    if (paidNow > dueAfterDiscount + 0.001) { setFormError("Le montant encaissé ne peut pas dépasser le montant dû après remise."); return; }
+    setFormError(null);
+    onConfirm(paidNow, discount, false);
+  };
+
+  const handleCrediterClient = () => {
+    if (!client) { setFormError("Cette réparation n'a pas de client associé — impossible d'enregistrer un crédit."); return; }
+    if (discount > repair.debt + 0.001) { setFormError("La remise ne peut pas dépasser le reste dû."); return; }
+    if (paidNow > dueAfterDiscount + 0.001) { setFormError("Le montant encaissé ne peut pas dépasser le montant dû après remise."); return; }
+    if (restDue <= 0.001) { setFormError("Il n'y a aucun reste à créditer : le montant encaissé couvre déjà tout le dû."); return; }
+    setFormError(null);
+    onConfirm(paidNow, discount, true);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+          <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+            <DollarSign className="w-5 h-5 text-teal-600" /> Caisse — Livraison
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl"><X className="w-5 h-5 text-slate-400" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <MoneyBlock label="Total réparation" value={repair.total} currency={currency} accent />
+            <MoneyBlock label="Reste dû actuel" value={repair.debt} currency={currency} danger={repair.debt > 0} />
+          </div>
+
+          {client && (
+            <p className="text-xs font-bold text-slate-500">Client : <span className="text-slate-800">{client.name}</span></p>
+          )}
+
+          <div>
+            <label className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5 block">Remise ({currency})</label>
+            <input
+              type="text" inputMode="decimal" value={discountInput}
+              onChange={(e) => { if (/^[\d.,]*$/.test(e.target.value)) setDiscountInput(e.target.value); }}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5 block">Montant encaissé maintenant ({currency})</label>
+            <input
+              type="text" inputMode="decimal" value={paidInput}
+              onChange={(e) => { if (/^[\d.,]*$/.test(e.target.value)) setPaidInput(e.target.value); }}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Reste après cet encaissement</span>
+            <span className={cn("font-black text-sm", restDue > 0 ? "text-rose-600" : "text-emerald-600")}>{restDue.toFixed(3)} {currency}</span>
+          </div>
+
+          {formError && (
+            <div className="flex items-start gap-2 bg-rose-50 text-rose-700 text-xs font-bold px-3 py-2.5 rounded-xl">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {formError}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 p-5 border-t border-slate-100">
+          <button
+            onClick={handleEncaisser} disabled={updating}
+            className="w-full py-3 rounded-xl font-bold text-sm text-white bg-teal-600 hover:bg-teal-700 transition-colors disabled:opacity-50"
+          >
+            Livrer & Encaisser {restDue > 0 ? '(reste en dette)' : ''}
+          </button>
+          <button
+            onClick={handleCrediterClient} disabled={updating || !client}
+            title={!client ? "Aucun client associé à cette réparation" : undefined}
+            className="w-full py-3 rounded-xl font-bold text-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors disabled:opacity-50"
+          >
+            Livrer & Créditer le reste au client
+          </button>
+          <button onClick={onClose} disabled={updating} className="w-full py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-colors">
+            Annuler
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
