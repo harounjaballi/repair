@@ -23,7 +23,7 @@ interface RepairsProps {
   userProfile: UserProfile | null;
 }
 
-const STATUS_STYLES: Record<RepairStatus, string> = {
+export const STATUS_STYLES: Record<RepairStatus, string> = {
   recu: 'bg-slate-100 text-slate-700 border-slate-200',
   diagnostic: 'bg-blue-50 text-blue-700 border-blue-200',
   en_attente_piece: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -34,7 +34,36 @@ const STATUS_STYLES: Record<RepairStatus, string> = {
   annule: 'bg-slate-100 text-slate-400 border-slate-200 line-through',
 };
 
-const ACTIVE_STATUSES: RepairStatus[] = ['recu', 'diagnostic', 'en_attente_piece', 'en_cours', 'termine'];
+export const ACTIVE_STATUSES: RepairStatus[] = ['recu', 'diagnostic', 'en_attente_piece', 'en_cours', 'termine'];
+
+// Compteur transactionnel partagé entre le module Réparations et son Historique.
+export async function generateNextRepairNumber(ownerId: string): Promise<string> {
+  const year = new Date().getFullYear();
+  const counterRef = doc(db, 'counters', `repairs_${ownerId}`);
+  let num = 1;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(counterRef);
+    num = (snap.exists() ? (snap.data().lastNum || 0) : 0) + 1;
+    tx.set(counterRef, { lastNum: num }, { merge: true });
+  });
+  return `REP-${year}-${num.toString().padStart(4, '0')}`;
+}
+
+// Suppression d'une réparation + restitution du stock des pièces utilisées,
+// partagée entre le module Réparations et son Historique.
+export async function deleteRepairAndRestoreStock(r: Repair): Promise<void> {
+  await runTransaction(db, async (tx) => {
+    for (const p of (r.parts || [])) {
+      const prodRef = doc(db, 'products', p.productId);
+      const prodSnap = await tx.get(prodRef);
+      if (prodSnap.exists()) {
+        const cur = prodSnap.data().stock || 0;
+        tx.update(prodRef, { stock: cur + p.quantity });
+      }
+    }
+    tx.delete(doc(db, 'repairs', r.id));
+  });
+}
 
 export default function Repairs({ userProfile }: RepairsProps) {
   const ownerId = userProfile?.ownerId || userProfile?.uid || 'no_user_auth';
@@ -125,34 +154,13 @@ export default function Repairs({ userProfile }: RepairsProps) {
   }, [repairs]);
 
   // ---- Generate next repair number (transactional counter) ----
-  const generateRepairNumber = async (): Promise<string> => {
-    const year = new Date().getFullYear();
-    const counterRef = doc(db, 'counters', `repairs_${ownerId}`);
-    let num = 1;
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(counterRef);
-      num = (snap.exists() ? (snap.data().lastNum || 0) : 0) + 1;
-      tx.set(counterRef, { lastNum: num }, { merge: true });
-    });
-    return `REP-${year}-${num.toString().padStart(4, '0')}`;
-  };
+  const generateRepairNumber = async (): Promise<string> => generateNextRepairNumber(ownerId);
 
   const handleDelete = async (r: Repair) => {
     if (userProfile?.role !== 'admin') { setError("Seul un administrateur peut supprimer une réparation."); return; }
     if (!window.confirm(`Supprimer la réparation ${r.number} ? Les pièces utilisées seront restituées au stock.`)) return;
     try {
-      await runTransaction(db, async (tx) => {
-        // Restituer le stock des pièces
-        for (const p of (r.parts || [])) {
-          const prodRef = doc(db, 'products', p.productId);
-          const prodSnap = await tx.get(prodRef);
-          if (prodSnap.exists()) {
-            const cur = prodSnap.data().stock || 0;
-            tx.update(prodRef, { stock: cur + p.quantity });
-          }
-        }
-        tx.delete(doc(db, 'repairs', r.id));
-      });
+      await deleteRepairAndRestoreStock(r);
       setSuccess(`Réparation ${r.number} supprimée, stock restitué.`);
       setDetailRepair(null);
     } catch (e: any) {
@@ -273,7 +281,7 @@ export default function Repairs({ userProfile }: RepairsProps) {
                 </p>
                 <div className="flex items-center gap-3 text-xs text-slate-400 mt-1 font-medium">
                   <span className="flex items-center gap-1"><User className="w-3 h-3" /> {r.clientName || 'Sans client'}</span>
-                  {r.date?.toDate && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {format(r.date.toDate(), 'dd/MM/yyyy')}</span>}
+                  {r.date?.toDate && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {format(r.date.toDate(), 'dd/MM/yyyy HH:mm')}</span>}
                 </div>
               </div>
               <div className="text-right shrink-0">
@@ -327,7 +335,7 @@ export default function Repairs({ userProfile }: RepairsProps) {
 // ============================================================
 //  FORMULAIRE DE RÉPARATION
 // ============================================================
-function RepairForm({
+export function RepairForm({
   repair, clients, products, settings, currency, ownerId, currentUserLabel,
   generateRepairNumber, onClose, onSaved, onError
 }: {
@@ -387,6 +395,14 @@ function RepairForm({
 
   const addPart = (p: Product) => {
     const existing = parts.find(x => x.productId === p.id);
+    const currentQty = existing ? existing.quantity : 0;
+    // En édition, le stock affiché exclut déjà ce que CETTE réparation a réservé :
+    // la quantité totale disponible pour cette pièce est donc stock + déjà réservé.
+    const maxAvailable = (p.stock || 0) + (isEdit ? currentQty : 0);
+    if (maxAvailable <= currentQty) {
+      onError(`Stock épuisé pour "${p.name}" — impossible d'ajouter cette pièce.`);
+      return;
+    }
     if (existing) {
       setParts(parts.map(x => x.productId === p.id
         ? { ...x, quantity: x.quantity + 1, total: (x.quantity + 1) * x.unitPrice }
@@ -402,6 +418,15 @@ function RepairForm({
 
   const updatePartQty = (id: string, qty: number) => {
     if (qty <= 0) { setParts(parts.filter(p => p.productId !== id)); return; }
+    const product = products.find(pr => pr.id === id);
+    const existing = parts.find(p => p.productId === id);
+    const currentQty = existing ? existing.quantity : 0;
+    const maxAvailable = product ? (product.stock || 0) + (isEdit ? currentQty : 0) : Infinity;
+    if (qty > maxAvailable) {
+      onError(`Stock insuffisant pour "${product?.name || 'cette pièce'}" — maximum disponible : ${maxAvailable}.`);
+      setParts(parts.map(p => p.productId === id ? { ...p, quantity: maxAvailable, total: maxAvailable * p.unitPrice } : p));
+      return;
+    }
     setParts(parts.map(p => p.productId === id ? { ...p, quantity: qty, total: qty * p.unitPrice } : p));
   };
   const updatePartPrice = (id: string, price: number) => {
@@ -709,7 +734,7 @@ function Field({ label, value, onChange, placeholder, type = 'text', full = fals
 // ============================================================
 //  DÉTAIL RÉPARATION + suivi + changement rapide de statut
 // ============================================================
-function RepairDetail({
+export function RepairDetail({
   repair, currency, canDelete, currentUserLabel, settings, ownerId, clients,
   onEdit, onClose, onDelete, onError, onSuccess
 }: {
@@ -830,9 +855,16 @@ function RepairDetail({
         <div className="flex items-center justify-between p-5 border-b border-slate-100 sticky top-0 bg-white rounded-t-3xl z-10">
           <div>
             <h2 className="text-lg font-black font-display text-indigo-600 font-mono">{repair.number}</h2>
-            <span className={cn("inline-block mt-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border", STATUS_STYLES[repair.status])}>
-              {REPAIR_STATUS_LABELS[repair.status]}
-            </span>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className={cn("inline-block px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border", STATUS_STYLES[repair.status])}>
+                {REPAIR_STATUS_LABELS[repair.status]}
+              </span>
+              {repair.date?.toDate && (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                  <Calendar className="w-3 h-3" /> Créé le {format(repair.date.toDate(), 'dd/MM/yyyy à HH:mm')}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onEdit} className="p-2 hover:bg-indigo-50 rounded-xl text-indigo-500" title="Modifier"><Edit3 className="w-4 h-4" /></button>
