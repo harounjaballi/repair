@@ -15,7 +15,7 @@ import {
   AlertCircle, Trash2, Package, Shield, FileText, Edit3, Phone,
   Calendar, ChevronRight, History, DollarSign, Filter
 } from 'lucide-react';
-import { cn, isSparePart } from '../lib/utils';
+import { cn, isSparePart, decodeAzertyBarcode } from '../lib/utils';
 import { format } from 'date-fns';
 import { RepairTicket } from './RepairTicket';
 
@@ -82,6 +82,22 @@ export default function Repairs({ userProfile }: RepairsProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const playBeep = (type: 'success' | 'error') => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = type === 'success' ? 950 : 300;
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.12);
+    } catch { /* ignore : audio non disponible */ }
+  };
+
   // ---- Data listeners ----
   useEffect(() => {
     const unsubRepairs = onSnapshot(
@@ -127,6 +143,44 @@ export default function Repairs({ userProfile }: RepairsProps) {
   useEffect(() => {
     if (error) { const t = setTimeout(() => setError(null), 5000); return () => clearTimeout(t); }
   }, [error]);
+
+  // ---- Recherche par douchette (scanner code à barre) ----
+  // Scanne le code du bon de dépôt (REP-xxxx) OU l'IMEI/série de l'appareil :
+  // les deux sont déjà pris en charge par le filtre de recherche ci-dessous.
+  useEffect(() => {
+    if (isFormOpen || detailRepair) return; // pas de scan pendant l'édition/le détail
+    let buffer = '';
+    let lastKeyTime = 0;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key === 'Tab' || e.key === 'Escape' || e.key === 'ArrowUp' || e.key === 'ArrowDown') return;
+
+      const now = Date.now();
+      const target = e.target as HTMLElement;
+      const isInputFocused = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT');
+      const interval = lastKeyTime ? now - lastKeyTime : 0;
+      lastKeyTime = now;
+
+      if (e.key.length === 1) {
+        if (isInputFocused && interval > 120) { buffer = e.key; return; }
+        buffer = interval > 120 ? e.key : buffer + e.key;
+      } else if (e.key === 'Enter') {
+        const code = decodeAzertyBarcode(buffer.trim());
+        buffer = '';
+        lastKeyTime = 0;
+        if (code.length >= 3) {
+          setSearchTerm(code);
+          setStatusFilter('all'); // pour retrouver la réparation même si elle est déjà livrée/annulée
+          playBeep('success');
+          if (isInputFocused) { e.preventDefault(); e.stopPropagation(); }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isFormOpen, detailRepair]);
 
   // ---- Filtering ----
   const filtered = useMemo(() => {
@@ -229,7 +283,7 @@ export default function Repairs({ userProfile }: RepairsProps) {
           <input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Rechercher : n°, client, téléphone, modèle, IMEI..."
+            placeholder="Rechercher : n°, client, téléphone, modèle, IMEI... (ou scannez le bon)"
             className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
           />
         </div>
