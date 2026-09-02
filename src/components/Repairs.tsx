@@ -499,6 +499,7 @@ export function RepairForm({
   const handleSubmit = async () => {
     if (!problem.trim()) { onError("Décrivez la panne signalée."); return; }
     if (!deviceModel.trim() && !deviceBrand.trim()) { onError("Indiquez au moins la marque ou le modèle."); return; }
+    if (debt > 0.001 && !clientId) { onError("Un client doit être sélectionné pour qu'une réparation puisse avoir un montant dû (dette). Enregistrez d'abord le client, ou encaissez le montant total."); return; }
     setSaving(true);
     try {
       const client = clients.find(c => c.id === clientId);
@@ -768,6 +769,12 @@ export function RepairForm({
               </div>
             </div>
             <Field label="Garantie (jours)" value={warrantyDays} onChange={setWarrantyDays} type="number" placeholder="30" />
+            {debt > 0.001 && !clientId && (
+              <div className="col-span-2 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2.5 rounded-xl text-xs font-bold">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                Un client doit être sélectionné pour enregistrer une réparation avec un reste dû.
+              </div>
+            )}
           </section>
         </div>
 
