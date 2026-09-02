@@ -373,6 +373,15 @@ export function RepairForm({
   );
   const [partSearch, setPartSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [printingRepair, setPrintingRepair] = useState<Repair | null>(null);
+
+  // Déclenche automatiquement l'impression du bon de dépôt dès la création.
+  useEffect(() => {
+    if (printingRepair) {
+      const t = setTimeout(() => window.print(), 300);
+      return () => clearTimeout(t);
+    }
+  }, [printingRepair]);
 
   const selectedClient = clients.find(c => c.id === clientId);
   const filteredClients = clients.filter(c =>
@@ -533,6 +542,7 @@ export function RepairForm({
         onSaved(`Réparation ${repair.number} mise à jour.`);
       } else {
         const number = await generateRepairNumber();
+        const repairRef = doc(collection(db, 'repairs'));
         // Créer + déduire le stock des pièces
         await runTransaction(db, async (tx) => {
           const refs: Record<string, any> = {};
@@ -547,10 +557,10 @@ export function RepairForm({
               tx.update(refs[p.productId], { stock: cur - p.quantity });
             }
           }
-          const repairRef = doc(collection(db, 'repairs'));
           tx.set(repairRef, { ...payload, number, date: serverTimestamp() });
         });
-        onSaved(`Réparation ${number} créée.`);
+        // Ouvre le bon de dépôt pour impression immédiate (au lieu de fermer directement).
+        setPrintingRepair({ ...payload, id: repairRef.id, number, date: { toDate: () => new Date() } } as Repair);
       }
     } catch (e: any) {
       onError("Erreur d'enregistrement : " + (e.message || e));
@@ -715,6 +725,41 @@ export function RepairForm({
           </button>
         </div>
       </div>
+
+      {/* Confirmation + impression automatique du bon de dépôt après création */}
+      {printingRepair && (
+        <div className="fixed inset-0 z-[80] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+            <h3 className="text-lg font-black text-slate-900">Réparation créée</h3>
+            <p className="text-sm text-slate-500 mt-1">
+              N° <span className="font-mono font-bold text-indigo-600">{printingRepair.number}</span>
+            </p>
+            <p className="text-xs text-slate-400 mt-2">Impression du bon de dépôt en cours...</p>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-colors"
+              >
+                Réimprimer
+              </button>
+              <button
+                onClick={() => onSaved(`Réparation ${printingRepair.number} créée.`)}
+                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-colors"
+              >
+                Terminer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {printingRepair && createPortal(
+        <div className="print-container">
+          <RepairTicket repair={printingRepair} ownerId={ownerId} />
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
