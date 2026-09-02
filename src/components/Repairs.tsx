@@ -890,10 +890,11 @@ export function RepairDetail({
     } finally { setUpdating(false); }
   };
 
-  // Confirmation de la livraison depuis la fenêtre de caisse : encaissement + remise,
-  // avec possibilité de créditer le reste au compte du client au lieu de le garder comme
-  // dette sur la fiche de réparation.
-  const confirmDelivery = async (paidNow: number, discount: number, creditRest: boolean) => {
+  // Confirmation de la livraison depuis la fenêtre de caisse : encaissement + remise.
+  // Toute réparation livrée doit être payée : le reste dû éventuel est obligatoirement
+  // crédité au compte du client (menu Clients) — jamais laissé comme simple dette sur
+  // la fiche réparation, d'où l'exigence d'un client déjà enregistré.
+  const confirmDelivery = async (paidNow: number, discount: number) => {
     setUpdating(true);
     try {
       const now = new Date().toISOString();
@@ -905,32 +906,34 @@ export function RepairDetail({
       const restAfterPaidNow = Math.max(0, Math.round((dueAfterDiscount - paidNow) * 1000) / 1000);
       const newTotal = Math.max(0, Math.round((repair.total - discount) * 1000) / 1000);
       const newPaid = Math.round((repair.paid + paidNow) * 1000) / 1000;
-      const newDebt = creditRest ? 0 : restAfterPaidNow;
+
+      if (restAfterPaidNow > 0 && !repairClient) {
+        throw new Error("Un client doit être enregistré sur la fiche pour livrer une réparation avec un reste dû.");
+      }
 
       let note = `Livré — Encaissé ${paidNow.toFixed(3)} ${currency}`;
       if (discount > 0) note += `, remise ${discount.toFixed(3)} ${currency}`;
-      if (creditRest && restAfterPaidNow > 0) note += `, ${restAfterPaidNow.toFixed(3)} ${currency} crédités au compte de ${repairClient?.name || 'client'}`;
+      if (restAfterPaidNow > 0) note += `, ${restAfterPaidNow.toFixed(3)} ${currency} crédités au compte de ${repairClient?.name}`;
 
       const log: RepairLog = { date: now, status: 'livre', note, by: currentUserLabel };
       const logs = [...(repair.logs || []), log];
 
-      if (creditRest && restAfterPaidNow > 0) {
-        if (!repairClient) throw new Error("Sélectionnez un client sur la fiche pour pouvoir créditer le reste dû.");
+      if (restAfterPaidNow > 0) {
         await runTransaction(db, async (tx) => {
-          const clientRef = doc(db, 'clients', repairClient.id);
+          const clientRef = doc(db, 'clients', repairClient!.id);
           const clientSnap = await tx.get(clientRef);
           if (!clientSnap.exists()) throw new Error('Client introuvable');
           const currentClientDebt = clientSnap.data().debt || 0;
           tx.update(doc(db, 'repairs', repair.id), {
             status: 'livre', deliveredAt: now, warrantyUntil: warrantyUntil || null,
-            total: newTotal, paid: newPaid, debt: newDebt, discount, logs,
+            total: newTotal, paid: newPaid, debt: 0, discount, logs,
           });
           tx.update(clientRef, { debt: currentClientDebt + restAfterPaidNow });
         });
       } else {
         await updateDoc(doc(db, 'repairs', repair.id), {
           status: 'livre', deliveredAt: now, warrantyUntil: warrantyUntil || null,
-          total: newTotal, paid: newPaid, debt: newDebt, discount, logs,
+          total: newTotal, paid: newPaid, debt: 0, discount, logs,
         });
       }
 
@@ -1107,7 +1110,7 @@ function DeliveryCaisseModal({
   currency: string;
   updating: boolean;
   onClose: () => void;
-  onConfirm: (paidNow: number, discount: number, creditRest: boolean) => void;
+  onConfirm: (paidNow: number, discount: number) => void;
 }) {
   const [discountInput, setDiscountInput] = useState('0');
   const [paidInput, setPaidInput] = useState(repair.debt.toFixed(3));
@@ -1118,20 +1121,15 @@ function DeliveryCaisseModal({
   const paidNow = Math.max(0, parseFloat(paidInput.replace(',', '.')) || 0);
   const restDue = Math.max(0, Math.round((dueAfterDiscount - paidNow) * 1000) / 1000);
 
-  const handleEncaisser = () => {
+  const handleLivrer = () => {
     if (discount > repair.debt + 0.001) { setFormError("La remise ne peut pas dépasser le reste dû."); return; }
     if (paidNow > dueAfterDiscount + 0.001) { setFormError("Le montant encaissé ne peut pas dépasser le montant dû après remise."); return; }
+    if (restDue > 0.001 && !client) {
+      setFormError("Un client doit être enregistré sur la fiche pour livrer avec un reste dû : le montant restant sera automatiquement ajouté à sa dette (menu Clients).");
+      return;
+    }
     setFormError(null);
-    onConfirm(paidNow, discount, false);
-  };
-
-  const handleCrediterClient = () => {
-    if (!client) { setFormError("Cette réparation n'a pas de client associé — impossible d'enregistrer un crédit."); return; }
-    if (discount > repair.debt + 0.001) { setFormError("La remise ne peut pas dépasser le reste dû."); return; }
-    if (paidNow > dueAfterDiscount + 0.001) { setFormError("Le montant encaissé ne peut pas dépasser le montant dû après remise."); return; }
-    if (restDue <= 0.001) { setFormError("Il n'y a aucun reste à créditer : le montant encaissé couvre déjà tout le dû."); return; }
-    setFormError(null);
-    onConfirm(paidNow, discount, true);
+    onConfirm(paidNow, discount);
   };
 
   return (
@@ -1150,8 +1148,13 @@ function DeliveryCaisseModal({
             <MoneyBlock label="Reste dû actuel" value={repair.debt} currency={currency} danger={repair.debt > 0} />
           </div>
 
-          {client && (
+          {client ? (
             <p className="text-xs font-bold text-slate-500">Client : <span className="text-slate-800">{client.name}</span></p>
+          ) : (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2.5 rounded-xl text-xs font-bold">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              Aucun client enregistré sur cette fiche — la livraison ne sera possible que si le montant est encaissé en totalité.
+            </div>
           )}
 
           <div>
@@ -1173,7 +1176,9 @@ function DeliveryCaisseModal({
           </div>
 
           <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Reste après cet encaissement</span>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+              {restDue > 0 ? 'Reste à créditer au client' : 'Reste après cet encaissement'}
+            </span>
             <span className={cn("font-black text-sm", restDue > 0 ? "text-rose-600" : "text-emerald-600")}>{restDue.toFixed(3)} {currency}</span>
           </div>
 
@@ -1186,17 +1191,10 @@ function DeliveryCaisseModal({
 
         <div className="flex flex-col gap-2 p-5 border-t border-slate-100">
           <button
-            onClick={handleEncaisser} disabled={updating}
+            onClick={handleLivrer} disabled={updating}
             className="w-full py-3 rounded-xl font-bold text-sm text-white bg-teal-600 hover:bg-teal-700 transition-colors disabled:opacity-50"
           >
-            Livrer & Encaisser {restDue > 0 ? '(reste en dette)' : ''}
-          </button>
-          <button
-            onClick={handleCrediterClient} disabled={updating || !client}
-            title={!client ? "Aucun client associé à cette réparation" : undefined}
-            className="w-full py-3 rounded-xl font-bold text-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors disabled:opacity-50"
-          >
-            Livrer & Créditer le reste au client
+            {restDue > 0 ? 'Livrer & Créditer le reste au client' : 'Livrer & Encaisser'}
           </button>
           <button onClick={onClose} disabled={updating} className="w-full py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-colors">
             Annuler
