@@ -427,7 +427,15 @@ export function RepairForm({
   );
   const [partSearch, setPartSearch] = useState('');
   const [saving, setSaving] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [printingRepair, setPrintingRepair] = useState<Repair | null>(null);
+
+  // Affiche l'erreur DIRECTEMENT dans la fenêtre (au lieu de seulement sur la page
+  // principale, cachée derrière la modale) tout en la remontant aussi au parent.
+  const showError = (msg: string) => { setLocalError(msg); onError(msg); };
+  useEffect(() => {
+    if (localError) { const t = setTimeout(() => setLocalError(null), 6000); return () => clearTimeout(t); }
+  }, [localError]);
 
   // Déclenche automatiquement l'impression du bon de dépôt dès la création.
   useEffect(() => {
@@ -463,7 +471,7 @@ export function RepairForm({
     // la quantité totale disponible pour cette pièce est donc stock + déjà réservé.
     const maxAvailable = (p.stock || 0) + (isEdit ? currentQty : 0);
     if (maxAvailable <= currentQty) {
-      onError(`Stock épuisé pour "${p.name}" — impossible d'ajouter cette pièce.`);
+      showError(`Stock épuisé pour "${p.name}" — impossible d'ajouter cette pièce.`);
       return;
     }
     if (existing) {
@@ -486,7 +494,7 @@ export function RepairForm({
     const currentQty = existing ? existing.quantity : 0;
     const maxAvailable = product ? (product.stock || 0) + (isEdit ? currentQty : 0) : Infinity;
     if (qty > maxAvailable) {
-      onError(`Stock insuffisant pour "${product?.name || 'cette pièce'}" — maximum disponible : ${maxAvailable}.`);
+      showError(`Stock insuffisant pour "${product?.name || 'cette pièce'}" — maximum disponible : ${maxAvailable}.`);
       setParts(parts.map(p => p.productId === id ? { ...p, quantity: maxAvailable, total: maxAvailable * p.unitPrice } : p));
       return;
     }
@@ -497,9 +505,9 @@ export function RepairForm({
   };
 
   const handleSubmit = async () => {
-    if (!problem.trim()) { onError("Décrivez la panne signalée."); return; }
-    if (!deviceModel.trim() && !deviceBrand.trim()) { onError("Indiquez au moins la marque ou le modèle."); return; }
-    if (debt > 0.001 && !clientId) { onError("Un client doit être sélectionné pour qu'une réparation puisse avoir un montant dû (dette). Enregistrez d'abord le client, ou encaissez le montant total."); return; }
+    if (!problem.trim()) { showError("Décrivez la panne signalée."); return; }
+    if (!deviceModel.trim() && !deviceBrand.trim()) { showError("Indiquez au moins la marque ou le modèle."); return; }
+    if (debt > 0.001 && !clientId) { showError("Un client doit être sélectionné pour qu'une réparation puisse avoir un montant dû (dette). Enregistrez d'abord le client, ou encaissez le montant total."); return; }
     setSaving(true);
     try {
       const client = clients.find(c => c.id === clientId);
@@ -618,7 +626,7 @@ export function RepairForm({
         setPrintingRepair({ ...payload, id: repairRef.id, number, date: { toDate: () => new Date() } } as Repair);
       }
     } catch (e: any) {
-      onError("Erreur d'enregistrement : " + (e.message || e));
+      showError("Erreur d'enregistrement : " + (e.message || e));
     } finally {
       setSaving(false);
     }
@@ -634,6 +642,12 @@ export function RepairForm({
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl"><X className="w-5 h-5 text-slate-400" /></button>
         </div>
+
+        {localError && (
+          <div className="mx-5 mt-4 flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm font-bold">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {localError}
+          </div>
+        )}
 
         <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Client */}
@@ -860,6 +874,14 @@ export function RepairDetail({
   const [quickNote, setQuickNote] = useState('');
   const [updating, setUpdating] = useState(false);
   const [showDeliveryCaisse, setShowDeliveryCaisse] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Affiche l'erreur DIRECTEMENT dans la fiche (au lieu de seulement sur la page
+  // principale, cachée derrière la modale) tout en la remontant aussi au parent.
+  const showError = (msg: string) => { setLocalError(msg); onError(msg); };
+  useEffect(() => {
+    if (localError) { const t = setTimeout(() => setLocalError(null), 6000); return () => clearTimeout(t); }
+  }, [localError]);
 
   const repairClient = clients.find(c => c.id === repair.clientId) || null;
 
@@ -886,7 +908,7 @@ export function RepairDetail({
       setQuickNote('');
       onSuccess(`Statut mis à jour : ${REPAIR_STATUS_LABELS[newStatus]}`);
     } catch (e: any) {
-      onError("Échec de la mise à jour : " + (e.message || e));
+      showError("Échec de la mise à jour : " + (e.message || e));
     } finally { setUpdating(false); }
   };
 
@@ -940,7 +962,7 @@ export function RepairDetail({
       setShowDeliveryCaisse(false);
       onSuccess('Réparation livrée et encaissement enregistré.');
     } catch (e: any) {
-      onError("Échec de l'encaissement : " + (e.message || e));
+      showError("Échec de l'encaissement : " + (e.message || e));
     } finally { setUpdating(false); }
   };
 
@@ -981,6 +1003,12 @@ export function RepairDetail({
             <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-xl"><X className="w-5 h-5 text-slate-400" /></button>
           </div>
         </div>
+
+        {localError && (
+          <div className="mx-5 mt-4 flex items-start gap-2 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm font-bold">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {localError}
+          </div>
+        )}
 
         <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
           {/* Client + appareil */}
