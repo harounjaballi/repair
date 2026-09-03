@@ -40,12 +40,12 @@ export const RepairTicket = forwardRef<HTMLDivElement, Props>(({ repair, ownerId
   const line = <div className="border-t border-dashed border-black my-1" />;
 
   return (
-    <div ref={ref} className="p-5 w-[80mm] mx-auto bg-white text-black font-mono text-[12px] leading-tight">
-      <div className="text-center font-bold text-[16px] uppercase">{storeName}</div>
+    <div ref={ref} className="p-5 w-[80mm] mx-auto bg-white text-black font-mono text-[10px] leading-tight">
+      <div className="text-center font-bold text-[13px] uppercase">{storeName}</div>
       <div className="text-center">{storeAddress}</div>
       {storePhone && <div className="text-center">Tél: {storePhone}</div>}
       {line}
-      <div className="text-center font-bold text-[13px]">BON DE DÉPÔT / RÉPARATION</div>
+      <div className="text-center font-bold text-[11px]">BON DE DÉPÔT / RÉPARATION</div>
       {line}
       <div className="flex justify-between"><span>N°</span><span className="font-bold">{repair.number}</span></div>
       {repair.number && (
@@ -93,21 +93,21 @@ export const RepairTicket = forwardRef<HTMLDivElement, Props>(({ repair, ownerId
       {(repair.estimatedCost || 0) > 0 && (
         <div className="flex justify-between"><span>Devis estimé</span><span>{(repair.estimatedCost || 0).toFixed(2)} {currency}</span></div>
       )}
-      <div className="flex justify-between font-bold text-[13px]"><span>TOTAL</span><span>{(repair.total || 0).toFixed(2)} {currency}</span></div>
+      <div className="flex justify-between font-bold text-[11px]"><span>TOTAL</span><span>{(repair.total || 0).toFixed(2)} {currency}</span></div>
       <div className="flex justify-between"><span>Acompte</span><span>{(repair.paid || 0).toFixed(2)} {currency}</span></div>
       <div className="flex justify-between font-bold"><span>RESTE DÛ</span><span>{(repair.debt || 0).toFixed(2)} {currency}</span></div>
       {repair.warrantyDays ? (
         <div className="flex justify-between"><span>Garantie</span><span>{repair.warrantyDays} j</span></div>
       ) : null}
       {line}
-      <div className="text-[9px] leading-snug mt-1">
+      <div className="text-[8px] leading-snug mt-1">
         Conditions : appareil laissé sous la responsabilité du client.
         Les données peuvent être perdues lors de la réparation ; sauvegarde
         à la charge du client. Tout appareil non récupéré sous 90 jours pourra
         être recyclé pour couvrir les frais. La garantie ne couvre que la panne
         réparée, hors casse, oxydation et mauvaise manipulation.
       </div>
-      <div className="mt-4 flex justify-between text-[10px]">
+      <div className="mt-4 flex justify-between text-[9px]">
         <div className="text-center">
           <div className="border-t border-black w-[30mm] mb-0.5" />
           Signature client
@@ -117,7 +117,7 @@ export const RepairTicket = forwardRef<HTMLDivElement, Props>(({ repair, ownerId
           L'atelier
         </div>
       </div>
-      <div className="text-center mt-3 text-[10px]">
+      <div className="text-center mt-3 text-[9px]">
         Conservez ce bon pour récupérer votre appareil.<br />{storeName}
       </div>
     </div>
