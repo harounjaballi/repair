@@ -12,6 +12,7 @@ interface Props {
 
 // Bon de dépôt / de réparation — format ticket 80mm, imprimable via le
 // même mécanisme .print-container que le ticket de caisse.
+// Contenu centré et police réduite pour tenir sur un minimum de longueur de rouleau.
 export const RepairTicket = forwardRef<HTMLDivElement, Props>(({ repair, ownerId }, ref) => {
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
 
@@ -38,23 +39,29 @@ export const RepairTicket = forwardRef<HTMLDivElement, Props>(({ repair, ownerId
   const currency = storeSettings?.currency || 'DT';
 
   const line = <div className="border-t border-dashed border-black my-1" />;
+  // Ligne clé/valeur centrée (au lieu d'un alignement gauche/droite)
+  const Row = ({ label, value, bold = false }: { label: string; value: string; bold?: boolean }) => (
+    <div className={`text-center ${bold ? 'font-bold' : ''}`}>
+      <span>{label} : </span><span>{value}</span>
+    </div>
+  );
 
   return (
-    <div ref={ref} className="p-5 w-[80mm] mx-auto bg-white text-black font-mono text-[10px] leading-tight">
-      <div className="text-center font-bold text-[13px] uppercase">{storeName}</div>
-      <div className="text-center">{storeAddress}</div>
-      {storePhone && <div className="text-center">Tél: {storePhone}</div>}
+    <div ref={ref} className="p-2 w-full bg-white text-black font-mono text-[7px] leading-snug text-center box-border">
+      <div className="font-bold text-[9px] uppercase">{storeName}</div>
+      <div>{storeAddress}</div>
+      {storePhone && <div>Tél: {storePhone}</div>}
       {line}
-      <div className="text-center font-bold text-[11px]">BON DE DÉPÔT / RÉPARATION</div>
+      <div className="font-bold text-[8px]">BON DE DÉPÔT / RÉPARATION</div>
       {line}
-      <div className="flex justify-between"><span>N°</span><span className="font-bold">{repair.number}</span></div>
+      <Row label="N°" value={repair.number} bold />
       {repair.number && (
         <div className="flex justify-center my-1">
-          <Barcode value={repair.number} height={38} moduleWidth={1.4} />
+          <Barcode value={repair.number} height={26} moduleWidth={1} />
         </div>
       )}
-      <div className="flex justify-between"><span>Date dépôt</span><span>{dateStr}</span></div>
-      <div className="flex justify-between"><span>Statut</span><span>{REPAIR_STATUS_LABELS[repair.status]}</span></div>
+      <Row label="Date dépôt" value={dateStr} />
+      <Row label="Statut" value={REPAIR_STATUS_LABELS[repair.status]} />
       {line}
       <div className="font-bold">CLIENT</div>
       <div>{repair.clientName || '—'}</div>
@@ -79,45 +86,40 @@ export const RepairTicket = forwardRef<HTMLDivElement, Props>(({ repair, ownerId
         <>
           <div className="font-bold">PIÈCES</div>
           {repair.parts.map((p, i) => (
-            <div key={i} className="flex justify-between">
-              <span className="max-w-[45mm] overflow-hidden text-ellipsis whitespace-nowrap">{p.name} x{p.quantity}</span>
-              <span>{p.total.toFixed(2)}</span>
-            </div>
+            <div key={i}>{p.name} x{p.quantity} — {p.total.toFixed(2)}</div>
           ))}
           {line}
         </>
       )}
       {(repair.laborCost || 0) > 0 && (
-        <div className="flex justify-between"><span>Main d'œuvre</span><span>{(repair.laborCost || 0).toFixed(2)} {currency}</span></div>
+        <Row label="Main d'œuvre" value={`${(repair.laborCost || 0).toFixed(2)} ${currency}`} />
       )}
       {(repair.estimatedCost || 0) > 0 && (
-        <div className="flex justify-between"><span>Devis estimé</span><span>{(repair.estimatedCost || 0).toFixed(2)} {currency}</span></div>
+        <Row label="Devis estimé" value={`${(repair.estimatedCost || 0).toFixed(2)} ${currency}`} />
       )}
-      <div className="flex justify-between font-bold text-[11px]"><span>TOTAL</span><span>{(repair.total || 0).toFixed(2)} {currency}</span></div>
-      <div className="flex justify-between"><span>Acompte</span><span>{(repair.paid || 0).toFixed(2)} {currency}</span></div>
-      <div className="flex justify-between font-bold"><span>RESTE DÛ</span><span>{(repair.debt || 0).toFixed(2)} {currency}</span></div>
-      {repair.warrantyDays ? (
-        <div className="flex justify-between"><span>Garantie</span><span>{repair.warrantyDays} j</span></div>
-      ) : null}
+      <Row label="TOTAL" value={`${(repair.total || 0).toFixed(2)} ${currency}`} bold />
+      <Row label="Acompte" value={`${(repair.paid || 0).toFixed(2)} ${currency}`} />
+      <Row label="RESTE DÛ" value={`${(repair.debt || 0).toFixed(2)} ${currency}`} bold />
+      {repair.warrantyDays ? <Row label="Garantie" value={`${repair.warrantyDays} j`} /> : null}
       {line}
-      <div className="text-[8px] leading-snug mt-1">
+      <div className="text-[5.5px] leading-snug mt-1">
         Conditions : appareil laissé sous la responsabilité du client.
         Les données peuvent être perdues lors de la réparation ; sauvegarde
         à la charge du client. Tout appareil non récupéré sous 90 jours pourra
         être recyclé pour couvrir les frais. La garantie ne couvre que la panne
         réparée, hors casse, oxydation et mauvaise manipulation.
       </div>
-      <div className="mt-4 flex justify-between text-[9px]">
+      <div className="mt-3 flex justify-center gap-6 text-[6px]">
         <div className="text-center">
-          <div className="border-t border-black w-[30mm] mb-0.5" />
+          <div className="border-t border-black w-[20mm] mb-0.5" />
           Signature client
         </div>
         <div className="text-center">
-          <div className="border-t border-black w-[30mm] mb-0.5" />
+          <div className="border-t border-black w-[20mm] mb-0.5" />
           L'atelier
         </div>
       </div>
-      <div className="text-center mt-3 text-[9px]">
+      <div className="mt-2 text-[6px]">
         Conservez ce bon pour récupérer votre appareil.<br />{storeName}
       </div>
     </div>
