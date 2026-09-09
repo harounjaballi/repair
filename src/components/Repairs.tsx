@@ -732,13 +732,23 @@ export function RepairForm({
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               {partProducts.length > 0 && (
                 <div className="absolute z-20 mt-1 w-full bg-white border border-slate-100 rounded-xl shadow-lg overflow-hidden">
-                  {partProducts.map(p => (
-                    <button key={p.id} onClick={() => addPart(p)}
-                      className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 text-sm border-b border-slate-50 last:border-0 flex justify-between">
-                      <span className="font-bold text-slate-800">{p.name}</span>
-                      <span className="text-xs text-slate-400">Stock {p.stock} · {p.sellPrice.toFixed(2)} {currency}</span>
-                    </button>
-                  ))}
+                  {partProducts.map(p => {
+                    const reserved = parts.find(x => x.productId === p.id)?.quantity || 0;
+                    const outOfStock = ((p.stock || 0) + (isEdit ? reserved : 0)) <= reserved;
+                    return (
+                      <button key={p.id} onClick={() => addPart(p)} disabled={outOfStock}
+                        className={`w-full text-left px-4 py-2.5 text-sm border-b border-slate-50 last:border-0 flex justify-between ${
+                          outOfStock
+                            ? 'bg-rose-50 cursor-not-allowed opacity-70'
+                            : 'hover:bg-indigo-50'
+                        }`}>
+                        <span className={`font-bold ${outOfStock ? 'text-rose-600' : 'text-slate-800'}`}>{p.name}</span>
+                        <span className={`text-xs ${outOfStock ? 'text-rose-500 font-bold' : 'text-slate-400'}`}>
+                          {outOfStock ? 'Stock épuisé' : `Stock ${p.stock}`} · {p.sellPrice.toFixed(2)} {currency}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
