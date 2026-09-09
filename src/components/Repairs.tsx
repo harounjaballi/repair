@@ -505,8 +505,9 @@ export function RepairForm({
   };
 
   const handleSubmit = async () => {
-    if (!problem.trim()) { showError("Décrivez la panne signalée."); return; }
-    if (!deviceModel.trim() && !deviceBrand.trim()) { showError("Indiquez au moins la marque ou le modèle."); return; }
+    if (!clientId) { showError("Sélectionnez un client."); return; }
+    if (!deviceBrand.trim()) { showError("Indiquez la marque de l'appareil."); return; }
+    if (!deviceModel.trim()) { showError("Indiquez le modèle de l'appareil."); return; }
     setSaving(true);
     try {
       const client = clients.find(c => c.id === clientId);
