@@ -648,12 +648,31 @@ export function RepairForm({
   };
 
   const handleSubmit = async () => {
-    if (!clientId) { showError("Sélectionnez un client."); return; }
+    // Si l'utilisateur a tapé un nom dans la recherche sans cliquer sur le client
+    // dans la liste, on le sélectionne automatiquement s'il correspond à un seul client.
+    let effectiveClientId = clientId;
+    if (!effectiveClientId && clientSearch.trim()) {
+      const q = clientSearch.trim().toLowerCase();
+      const matches = clients.filter(c =>
+        c.name.toLowerCase().includes(q) || (c.phone || '').includes(clientSearch.trim())
+      );
+      if (matches.length === 1) {
+        effectiveClientId = matches[0].id;
+        setClientId(matches[0].id);
+        setClientSearch('');
+      }
+    }
+    if (!effectiveClientId) {
+      showError(clientSearch.trim()
+        ? "Cliquez sur le client dans la liste de résultats pour le sélectionner (ou précisez la recherche)."
+        : "Sélectionnez un client.");
+      return;
+    }
     if (!deviceBrand.trim()) { showError("Indiquez la marque de l'appareil."); return; }
     if (!deviceModel.trim()) { showError("Indiquez le modèle de l'appareil."); return; }
     setSaving(true);
     try {
-      const client = clients.find(c => c.id === clientId);
+      const client = clients.find(c => c.id === effectiveClientId);
       const now = new Date().toISOString();
 
       // Détecter changement de statut pour l'historique
@@ -696,7 +715,7 @@ export function RepairForm({
       const logs = cleanLogs;
 
       const payload: any = {
-        clientId: clientId || '',
+        clientId: effectiveClientId || '',
         clientName: client?.name || '',
         clientPhone: client?.phone || '',
         deviceBrand: deviceBrand.trim(),
@@ -810,7 +829,7 @@ export function RepairForm({
                 <input
                   value={clientSearch}
                   onChange={(e) => setClientSearch(e.target.value)}
-                  placeholder="Rechercher un client (nom, téléphone)... — optionnel"
+                  placeholder="Rechercher un client (nom, téléphone)..."
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
                 {clientSearch && filteredClients.length > 0 && (
