@@ -648,9 +648,12 @@ export function RepairForm({
   };
 
   const handleSubmit = async () => {
-    // Si l'utilisateur a tapé un nom dans la recherche sans cliquer sur le client
-    // dans la liste, on le sélectionne automatiquement s'il correspond à un seul client.
+    // Si l'utilisateur a tapé un nom dans la recherche sans cliquer sur le client :
+    // - correspond à un seul client existant → sélection automatique
+    // - ne correspond à aucun client → le client est CRÉÉ automatiquement avec ce nom
+    // - correspond à plusieurs clients → on demande de préciser
     let effectiveClientId = clientId;
+    let createdClientName = '';
     if (!effectiveClientId && clientSearch.trim()) {
       const q = clientSearch.trim().toLowerCase();
       const matches = clients.filter(c =>
@@ -660,11 +663,25 @@ export function RepairForm({
         effectiveClientId = matches[0].id;
         setClientId(matches[0].id);
         setClientSearch('');
+      } else if (matches.length === 0) {
+        try {
+          const newClientRef = await addDoc(collection(db, 'clients'), {
+            name: clientSearch.trim(), code: '', phone: '', address: '', debt: 0,
+            ownerId, userId: ownerId
+          });
+          effectiveClientId = newClientRef.id;
+          createdClientName = clientSearch.trim();
+          setClientId(newClientRef.id);
+          setClientSearch('');
+        } catch (e: any) {
+          showError("Impossible de créer le client : " + (e.message || e));
+          return;
+        }
       }
     }
     if (!effectiveClientId) {
       showError(clientSearch.trim()
-        ? "Cliquez sur le client dans la liste de résultats pour le sélectionner (ou précisez la recherche)."
+        ? "Plusieurs clients correspondent — cliquez sur le bon client dans la liste de résultats."
         : "Sélectionnez un client.");
       return;
     }
@@ -716,7 +733,7 @@ export function RepairForm({
 
       const payload: any = {
         clientId: effectiveClientId || '',
-        clientName: client?.name || '',
+        clientName: client?.name || createdClientName || '',
         clientPhone: client?.phone || '',
         deviceBrand: deviceBrand.trim(),
         deviceModel: deviceModel.trim(),
