@@ -1134,6 +1134,15 @@ export function RepairDetail({
             total: newTotal, paid: newPaid, debt: 0, discount, logs,
           });
           tx.update(clientRef, { debt: currentClientDebt + restAfterPaidNow });
+          tx.set(doc(collection(db, 'client_debts')), {
+            clientId: repairClient!.id,
+            type: 'reparation',
+            reference: repair.number,
+            amount: restAfterPaidNow,
+            date: serverTimestamp(),
+            by: currentUserLabel,
+            ownerId,
+          });
         });
       } else {
         await updateDoc(doc(db, 'repairs', repair.id), {
