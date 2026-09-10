@@ -518,7 +518,15 @@ export default function Dashboard({ userProfile }: DashboardProps) {
         dailyMap[dayKey] = { dateStr: dayKey, dateObj: d, count: 0, revenue: 0, partsCost: 0, profit: 0 };
       }
 
-      const partsCost = (r.parts || []).reduce((s: number, p: any) => s + (p.unitBuyPrice || 0) * (p.quantity || 0), 0);
+      // Coût d'une pièce = prix d'achat figé sur la ligne au moment de la réparation ;
+      // s'il n'a pas été enregistré (anciennes données, prix d'achat non saisi), repli
+      // sur le prix d'achat actuel de la pièce dans le stock.
+      const partsCost = (r.parts || []).reduce((s: number, p: any) => {
+        const unitCost = (p.unitBuyPrice && p.unitBuyPrice > 0)
+          ? p.unitBuyPrice
+          : (productBuyPriceMap[p.productId] || 0);
+        return s + unitCost * (p.quantity || 0);
+      }, 0);
       const revenue = r.total || 0;
       const rec = dailyMap[dayKey];
       rec.count += 1;
@@ -528,7 +536,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
     });
 
     return Object.values(dailyMap).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
-  }, [repairs]);
+  }, [repairs, productBuyPriceMap]);
 
   const repairProfitTotal = useMemo(
     () => dailyRepairRecords.reduce((s, r) => s + r.profit, 0),
