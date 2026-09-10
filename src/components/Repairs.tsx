@@ -202,10 +202,57 @@ export default function Repairs({ userProfile }: RepairsProps) {
   const stats = useMemo(() => {
     const active = repairs.filter(r => ACTIVE_STATUSES.includes(r.status)).length;
     const ready = repairs.filter(r => r.status === 'termine').length;
-    const waitingParts = repairs.filter(r => r.status === 'en_attente_piece').length;
-    const unpaid = repairs.reduce((s, r) => s + (r.debt || 0), 0);
-    return { active, ready, waitingParts, unpaid };
+    return { active, ready, total: repairs.length };
   }, [repairs]);
+
+  // ---- Historiques journaliers des indicateurs ----
+  const [statsModal, setStatsModal] = useState<'count' | 'profit' | null>(null);
+
+  const toJsDate = (src: any): Date => {
+    if (!src) return new Date();
+    if (typeof src.toDate === 'function') return src.toDate();
+    return new Date(src);
+  };
+  const dayKeyOf = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  // Nombre de réparations créées par jour (tous statuts)
+  const dailyRepairCounts = useMemo(() => {
+    const map: Record<string, { dateStr: string; count: number }> = {};
+    repairs.forEach(r => {
+      const key = dayKeyOf(toJsDate(r.date));
+      if (!map[key]) map[key] = { dateStr: key, count: 0 };
+      map[key].count += 1;
+    });
+    return Object.values(map).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+  }, [repairs]);
+
+  // Bénéfice net par jour des réparations livrées (facturé - coût d'achat des pièces).
+  // Coût pièce = prix d'achat figé sur la ligne ; repli sur le prix d'achat actuel si absent.
+  const dailyNetProfit = useMemo(() => {
+    const map: Record<string, { dateStr: string; count: number; revenue: number; partsCost: number; profit: number }> = {};
+    repairs.filter(r => r.status === 'livre').forEach(r => {
+      const key = dayKeyOf(toJsDate(r.deliveredAt || r.date));
+      if (!map[key]) map[key] = { dateStr: key, count: 0, revenue: 0, partsCost: 0, profit: 0 };
+      const partsCost = (r.parts || []).reduce((s, p) => {
+        const unitCost = (p.unitBuyPrice && p.unitBuyPrice > 0)
+          ? p.unitBuyPrice
+          : (products.find(pr => pr.id === p.productId)?.buyPrice || 0);
+        return s + unitCost * (p.quantity || 0);
+      }, 0);
+      const revenue = r.total || 0;
+      map[key].count += 1;
+      map[key].revenue += revenue;
+      map[key].partsCost += partsCost;
+      map[key].profit += (revenue - partsCost);
+    });
+    return Object.values(map).sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+  }, [repairs, products]);
+
+  const todayProfit = useMemo(() => {
+    const todayKey = dayKeyOf(new Date());
+    return dailyNetProfit.find(d => d.dateStr === todayKey)?.profit || 0;
+  }, [dailyNetProfit]);
 
   // ---- Generate next repair number (transactional counter) ----
   const generateRepairNumber = async (): Promise<string> => generateNextRepairNumber(ownerId);
@@ -248,17 +295,26 @@ export default function Repairs({ userProfile }: RepairsProps) {
         {[
           { label: 'En cours', value: stats.active, icon: Clock, color: 'from-indigo-500 to-indigo-600' },
           { label: 'Prêts à récupérer', value: stats.ready, icon: CheckCircle, color: 'from-emerald-500 to-emerald-600' },
-          { label: 'Attente pièces', value: stats.waitingParts, icon: Package, color: 'from-amber-500 to-amber-600' },
-          { label: 'Impayés', value: `${stats.unpaid.toFixed(2)} ${currency}`, icon: DollarSign, color: 'from-rose-500 to-rose-600' },
-        ].map((s, i) => {
+          { label: 'Total réparations', value: stats.total, icon: Package, color: 'from-amber-500 to-amber-600', onClick: () => setStatsModal('count') },
+          { label: 'Bénéfice net du jour', value: `${todayProfit.toFixed(2)} ${currency}`, icon: DollarSign, color: 'from-teal-500 to-cyan-600', onClick: () => setStatsModal('profit') },
+        ].map((s: any, i) => {
           const Icon = s.icon;
           return (
-            <div key={i} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+            <div key={i} onClick={s.onClick}
+              className={cn(
+                "bg-white rounded-2xl p-4 border border-slate-100 shadow-sm",
+                s.onClick && "cursor-pointer hover:border-indigo-200 hover:shadow-md active:scale-[0.99] transition-all"
+              )}>
               <div className={cn("w-10 h-10 rounded-xl bg-gradient-to-tr flex items-center justify-center mb-3", s.color)}>
                 <Icon className="w-5 h-5 text-white" />
               </div>
               <p className="text-2xl font-black text-slate-900 font-display">{s.value}</p>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">{s.label}</p>
+              {s.onClick && (
+                <p className="text-[9px] font-bold text-slate-300 mt-1 flex items-center gap-1">
+                  <History className="w-3 h-3 shrink-0" /> Historique journalier
+                </p>
+              )}
             </div>
           );
         })}
@@ -347,6 +403,88 @@ export default function Repairs({ userProfile }: RepairsProps) {
           </div>
         ))}
       </div>
+
+      {/* Historique journalier des indicateurs */}
+      {statsModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4 overflow-y-auto"
+          onClick={() => setStatsModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="font-black text-slate-900 flex items-center gap-2">
+                <History className="w-5 h-5 text-indigo-500" />
+                {statsModal === 'count' ? 'Réparations par jour' : 'Bénéfice net par jour'}
+              </h3>
+              <button onClick={() => setStatsModal(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              {statsModal === 'count' ? (
+                dailyRepairCounts.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-6">Aucune réparation enregistrée.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-[11px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                        <th className="text-left py-2">Date</th>
+                        <th className="text-right py-2">Réparations</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dailyRepairCounts.map(d => (
+                        <tr key={d.dateStr} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2 font-semibold text-slate-700">{format(new Date(d.dateStr), 'dd/MM/yyyy')}</td>
+                          <td className="py-2 text-right font-black text-slate-900">{d.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-slate-200">
+                        <td className="py-2 font-black text-slate-500 text-xs uppercase tracking-wider">Total</td>
+                        <td className="py-2 text-right font-black text-indigo-600">{stats.total}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )
+              ) : (
+                dailyNetProfit.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-6">Aucune réparation livrée.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-[11px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                        <th className="text-left py-2">Date</th>
+                        <th className="text-right py-2">Livrées</th>
+                        <th className="text-right py-2">Facturé</th>
+                        <th className="text-right py-2">Coût pièces</th>
+                        <th className="text-right py-2">Bénéfice</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dailyNetProfit.map(d => (
+                        <tr key={d.dateStr} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2 font-semibold text-slate-700">{format(new Date(d.dateStr), 'dd/MM/yyyy')}</td>
+                          <td className="py-2 text-right text-slate-600">{d.count}</td>
+                          <td className="py-2 text-right text-slate-600">{d.revenue.toFixed(2)}</td>
+                          <td className="py-2 text-right text-rose-500">{d.partsCost.toFixed(2)}</td>
+                          <td className="py-2 text-right font-black text-teal-600">{d.profit.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-slate-200">
+                        <td className="py-2 font-black text-slate-500 text-xs uppercase tracking-wider" colSpan={4}>Total</td>
+                        <td className="py-2 text-right font-black text-teal-600">
+                          {dailyNetProfit.reduce((s, d) => s + d.profit, 0).toFixed(2)} {currency}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form modal */}
       {isFormOpen && (
