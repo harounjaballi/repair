@@ -876,8 +876,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{isPartMode ? 'Pièces détachées' : 'Produits'}</h1>
-          <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-0.5">{isPartMode ? 'Pièces utilisées pour les réparations (atelier)' : 'Produits vendables en caisse'}</p>
+          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">{isPartMode ? 'Pièces détachées' : 'Articles'}</h1>
+          <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mt-0.5">{isPartMode ? 'Pièces utilisées pour les réparations (atelier)' : 'Articles vendables en caisse'}</p>
         </div>
         <div className="flex gap-2.5">
           <button
@@ -885,7 +885,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
             className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-300 shadow-lg shadow-indigo-600/15 group hover:-translate-y-0.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 transition-transform group-hover:rotate-90 duration-300" />
-            {isPartMode ? 'Nouvelle Pièce' : 'Nouveau Produit'}
+            {isPartMode ? 'Nouvelle Pièce' : 'Nouvel Article'}
           </button>
         </div>
       </div>
@@ -900,7 +900,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                 type="text"
                 name="product-search"
                 autoComplete="off"
-                placeholder={isPartMode ? 'Rechercher une pièce...' : 'Rechercher un produit...'}
+                placeholder={isPartMode ? 'Rechercher une pièce...' : 'Rechercher un article...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white text-xs font-semibold text-slate-700 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all duration-300"
@@ -953,7 +953,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100 text-slate-400 text-[10px] font-extrabold uppercase tracking-widest">
-                <th className="px-6 py-4">Produit</th>
+                <th className="px-6 py-4">{isPartMode ? 'Pièce' : 'Article'}</th>
                 <th className="px-6 py-4">Catégorie</th>
                 <th className="px-6 py-4">Prix Achat</th>
                 <th className="px-6 py-4">Prix Vente</th>
@@ -968,7 +968,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-gray-500">Aucun produit trouvé.</td>
+                  <td colSpan={6} className="px-6 py-10 text-center text-gray-500">{isPartMode ? 'Aucune pièce trouvée.' : 'Aucun article trouvé.'}</td>
                 </tr>
               ) : (
                 filteredProducts.map((product) => (
@@ -1074,7 +1074,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
               <h2 className="text-lg font-bold text-gray-900">
                 {isPartMode
                   ? (editingProduct ? 'Modifier la Pièce' : 'Nouvelle Pièce')
-                  : (editingProduct ? 'Modifier Produit' : 'Nouveau Produit')}
+                  : (editingProduct ? "Modifier l'Article" : 'Nouvel Article')}
               </h2>
               <button onClick={closeModal} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
                 <X className="w-5 h-5" />
@@ -1091,7 +1091,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                 )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className={cn("col-span-2", isPartMode && "order-2")}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{isPartMode ? 'Description' : 'Nom du produit'}</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{isPartMode ? 'Description' : "Nom de l'article"}</label>
                     <input
                       type="text"
                       required
