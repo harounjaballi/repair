@@ -70,6 +70,30 @@ export interface Client {
   createdAt?: string;
 }
 
+// ---------- MOUVEMENTS DE DETTE CLIENT ----------
+// Journal des dettes ajoutées / réglées sur le compte d'un client,
+// avec leur origine (réparation, achat d'articles, règlement, ajustement manuel).
+
+export type ClientDebtType = 'reparation' | 'achat' | 'reglement' | 'manuel';
+
+export const CLIENT_DEBT_TYPE_LABELS: Record<ClientDebtType, string> = {
+  reparation: 'Dette réparation',
+  achat: 'Dette achat article',
+  reglement: 'Règlement',
+  manuel: 'Ajustement manuel',
+};
+
+export interface ClientDebtEntry {
+  id: string;
+  clientId: string;
+  type: ClientDebtType;
+  reference?: string;   // N° de la réparation (REP-...) ou de la facture d'achat (FAC-...)
+  amount: number;       // positif = dette ajoutée, négatif = règlement / réduction
+  date: any;
+  by?: string;
+  ownerId?: string;
+}
+
 // ---------- RÉPARATION ----------
 
 export type RepairStatus =
