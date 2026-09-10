@@ -181,6 +181,13 @@ service cloud.firestore {
       allow delete: if hasAccess(resource.data.ownerId);
     }
 
+    match /client_debts/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if hasAccess(request.resource.data.ownerId);
+      allow update: if hasAccess(resource.data.ownerId);
+      allow delete: if hasAccess(resource.data.ownerId);
+    }
+
     match /repairs/{repairId} {
       allow read: if isAuthenticated();
       allow create: if hasAccess(request.resource.data.ownerId);
