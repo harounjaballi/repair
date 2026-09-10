@@ -424,6 +424,19 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     }
   };
 
+  // Ajustement rapide du stock (+1 / -1) depuis la liste, sans passer par un formulaire.
+  // Comme la modification du stock via l'édition, il ne génère ni dépense ni ligne d'historique.
+  const quickAdjustStock = async (product: Product, delta: number) => {
+    const current = product.stock || 0;
+    if (delta < 0 && current <= 0) return;
+    const newStock = Math.max(0, current + delta);
+    try {
+      await updateDoc(doc(db, 'products', product.id), { stock: newStock });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'products');
+    }
+  };
+
   const handleReplenishSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replenishProduct || !replenishQty) return;
@@ -1014,6 +1027,23 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         {product.stock <= (product.lowStockAlert || 5) && (
                           <AlertTriangle className="w-4 h-4 text-red-500" />
                         )}
+                        <div className="flex items-center gap-1 ml-1">
+                          <button
+                            onClick={() => quickAdjustStock(product, -1)}
+                            disabled={(product.stock || 0) <= 0}
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 font-black text-sm leading-none transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            title="Retirer 1 du stock"
+                          >
+                            −
+                          </button>
+                          <button
+                            onClick={() => quickAdjustStock(product, 1)}
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 font-black text-sm leading-none transition-colors cursor-pointer"
+                            title="Ajouter 1 au stock"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                       )}
                     </td>
