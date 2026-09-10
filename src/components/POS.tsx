@@ -641,6 +641,15 @@ export default function POS({ userProfile }: POSProps) {
 
           if (clientUpdate) {
             transaction.update(clientUpdate.ref, { debt: clientUpdate.newDebt });
+            transaction.set(doc(collection(db, 'client_debts')), {
+              clientId: selectedClient!.id,
+              type: 'achat',
+              reference: invoiceNumber,
+              amount: effDebt,
+              date: serverTimestamp(),
+              ownerId,
+              userId: userProfile?.uid || ownerId
+            });
           }
 
           const saleRef = doc(collection(db, 'sales'));
