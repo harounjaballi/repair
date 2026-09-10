@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy, where, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Client, StoreSettings, UserProfile } from '../types';
+import { Client, ClientDebtEntry, CLIENT_DEBT_TYPE_LABELS, StoreSettings, UserProfile } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
-import { Plus, Search, Edit2, Trash2, X, Phone, MapPin, Wallet, Coins, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Phone, MapPin, Wallet, Coins, AlertCircle, CheckCircle, History, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface ClientsProps {
@@ -26,6 +26,9 @@ export default function Clients({ userProfile }: ClientsProps) {
   const [settlingClient, setSettlingClient] = useState<Client | null>(null);
   const [settleAmountInput, setSettleAmountInput] = useState('');
   const [settleAmount, setSettleAmount] = useState<number>(0);
+  const [debtHistoryClient, setDebtHistoryClient] = useState<Client | null>(null);
+  const [debtEntries, setDebtEntries] = useState<ClientDebtEntry[]>([]);
+  const [loadingDebtHistory, setLoadingDebtHistory] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -72,12 +75,28 @@ export default function Clients({ userProfile }: ClientsProps) {
           ownerId,
           userId: userProfile?.uid || ownerId
         });
+        // Journaliser un changement manuel du montant de la dette
+        const debtDelta = Math.round(((formData.debt || 0) - (editingClient.debt || 0)) * 1000) / 1000;
+        if (Math.abs(debtDelta) > 0.0005) {
+          await addDoc(collection(db, 'client_debts'), {
+            clientId: editingClient.id,
+            type: 'manuel', reference: '', amount: debtDelta,
+            date: serverTimestamp(), ownerId, userId: userProfile?.uid || ownerId
+          });
+        }
       } else {
-        await addDoc(collection(db, 'clients'), {
+        const newClientRef = await addDoc(collection(db, 'clients'), {
           ...formData,
           ownerId,
           userId: userProfile?.uid || ownerId
         });
+        if ((formData.debt || 0) > 0.0005) {
+          await addDoc(collection(db, 'client_debts'), {
+            clientId: newClientRef.id,
+            type: 'manuel', reference: '', amount: formData.debt,
+            date: serverTimestamp(), ownerId, userId: userProfile?.uid || ownerId
+          });
+        }
       }
       closeModal();
     } catch (error) {
@@ -136,6 +155,42 @@ export default function Clients({ userProfile }: ClientsProps) {
     setSettlingClient(null);
   };
 
+  // Détail des dettes d'un client : origine (réparation / achat article / règlement /
+  // ajustement manuel) + référence (REP-... ou FAC-...) + montant.
+  const openDebtHistory = async (client: Client) => {
+    setDebtHistoryClient(client);
+    setDebtEntries([]);
+    setLoadingDebtHistory(true);
+    try {
+      const snap = await getDocs(query(
+        collection(db, 'client_debts'),
+        where('ownerId', '==', ownerId),
+        where('clientId', '==', client.id)
+      ));
+      const parseDate = (d: any): number => {
+        if (!d) return 0;
+        if (typeof d.toDate === 'function') return d.toDate().getTime();
+        const t = new Date(d).getTime();
+        return isNaN(t) ? 0 : t;
+      };
+      const entries = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as ClientDebtEntry))
+        .sort((a, b) => parseDate(b.date) - parseDate(a.date));
+      setDebtEntries(entries);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'client_debts');
+    } finally {
+      setLoadingDebtHistory(false);
+    }
+  };
+
+  const formatDebtDate = (d: any): string => {
+    if (!d) return '—';
+    const dt = typeof d.toDate === 'function' ? d.toDate() : new Date(d);
+    if (isNaN(dt.getTime())) return '—';
+    return dt.toLocaleDateString('fr-FR') + ' ' + dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  };
+
   const handleSettleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!settlingClient) return;
@@ -183,6 +238,14 @@ export default function Clients({ userProfile }: ClientsProps) {
       }
 
       batch.update(doc(db, 'clients', settlingClient.id), { debt: newDebt });
+
+      if (settleAmount > 0.0005) {
+        batch.set(doc(collection(db, 'client_debts')), {
+          clientId: settlingClient.id,
+          type: 'reglement', reference: '', amount: -settleAmount,
+          date: serverTimestamp(), ownerId, userId: userProfile?.uid || ownerId
+        });
+      }
 
       await batch.commit();
       closeSettleModal();
@@ -314,6 +377,13 @@ export default function Clients({ userProfile }: ClientsProps) {
                           </button>
                         )}
                         <button
+                          onClick={() => openDebtHistory(client)}
+                          className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Détail des dettes (origine et référence)"
+                        >
+                          <History className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => openModal(client)}
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
@@ -434,6 +504,65 @@ export default function Clients({ userProfile }: ClientsProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modale Détail des dettes */}
+      {debtHistoryClient && (
+        <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-2 sm:p-4 bg-black/40 backdrop-blur-sm overflow-y-auto"
+          onClick={() => setDebtHistoryClient(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="font-black text-slate-900 flex items-center gap-2">
+                  <History className="w-5 h-5 text-indigo-500" /> Détail des dettes
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  {debtHistoryClient.name} — dette actuelle :{' '}
+                  <span className={cn("font-black", debtHistoryClient.debt > 0 ? "text-red-600" : "text-emerald-600")}>
+                    {debtHistoryClient.debt.toFixed(3)} {storeSettings?.currency || 'DT'}
+                  </span>
+                </p>
+              </div>
+              <button onClick={() => setDebtHistoryClient(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              {loadingDebtHistory ? (
+                <div className="flex items-center justify-center py-8 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                </div>
+              ) : debtEntries.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-6">
+                  Aucun mouvement de dette enregistré pour ce client.
+                  <br />
+                  <span className="text-xs">(Le détail est journalisé pour les nouvelles opérations : réparations livrées, ventes à crédit, règlements, ajustements.)</span>
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {debtEntries.map(entry => (
+                    <div key={entry.id} className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-4 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">
+                          {CLIENT_DEBT_TYPE_LABELS[entry.type] || entry.type}
+                          {entry.reference && <span className="ml-1.5 text-indigo-600 font-mono text-xs font-black">{entry.reference}</span>}
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-medium">{formatDebtDate(entry.date)}{entry.by ? ` · ${entry.by}` : ''}</p>
+                      </div>
+                      <span className={cn(
+                        "shrink-0 font-black font-mono text-sm",
+                        entry.amount >= 0 ? "text-red-600" : "text-emerald-600"
+                      )}>
+                        {entry.amount >= 0 ? '+' : ''}{entry.amount.toFixed(3)} {storeSettings?.currency || 'DT'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
