@@ -254,6 +254,11 @@ export default function Repairs({ userProfile }: RepairsProps) {
     return dailyNetProfit.find(d => d.dateStr === todayKey)?.profit || 0;
   }, [dailyNetProfit]);
 
+  const todayCount = useMemo(() => {
+    const todayKey = dayKeyOf(new Date());
+    return dailyRepairCounts.find(d => d.dateStr === todayKey)?.count || 0;
+  }, [dailyRepairCounts]);
+
   // ---- Generate next repair number (transactional counter) ----
   const generateRepairNumber = async (): Promise<string> => generateNextRepairNumber(ownerId);
 
@@ -295,7 +300,7 @@ export default function Repairs({ userProfile }: RepairsProps) {
         {[
           { label: 'En cours', value: stats.active, icon: Clock, color: 'from-indigo-500 to-indigo-600' },
           { label: 'Prêts à récupérer', value: stats.ready, icon: CheckCircle, color: 'from-emerald-500 to-emerald-600' },
-          { label: 'Total réparations', value: stats.total, icon: Package, color: 'from-amber-500 to-amber-600', onClick: () => setStatsModal('count') },
+          { label: 'Réparations du jour', value: todayCount, icon: Package, color: 'from-amber-500 to-amber-600', onClick: () => setStatsModal('count') },
           { label: 'Bénéfice net du jour', value: `${todayProfit.toFixed(2)} ${currency}`, icon: DollarSign, color: 'from-teal-500 to-cyan-600', onClick: () => setStatsModal('profit') },
         ].map((s: any, i) => {
           const Icon = s.icon;
