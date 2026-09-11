@@ -388,7 +388,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
       .slice(0, 5);
 
     // 6. Low stock alerts
-    const lowStockAlerts = products.filter(p => p.stock <= (p.lowStockAlert || 5));
+    const lowStockAlerts = products.filter(p => p.stock <= (p.lowStockAlert ?? 0));
 
     return {
       dailyRevenue,
@@ -1378,7 +1378,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                   <div key={product.id} className="flex items-center justify-between py-3 first:pt-1 last:pb-1">
                     <div className="min-w-0 flex-1 pr-2">
                       <h4 className="font-extrabold text-xs text-slate-700 truncate" title={product.name}>{product.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Seuil minimal : {product.lowStockAlert || 5} unités</p>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Seuil minimal : {product.lowStockAlert ?? 0} unités</p>
                     </div>
                     <div className="text-right shrink-0">
                       <span className={cn(
@@ -1733,7 +1733,7 @@ export default function Dashboard({ userProfile }: DashboardProps) {
                                 <span className={cn(
                                   "px-2.5 py-1 rounded-xl text-xs font-black font-mono inline-block border",
                                   stock === 0 ? "bg-red-50 text-red-700 border-red-100" :
-                                  stock <= (product.lowStockAlert || 5) ? "bg-rose-50 text-rose-700 border-rose-100" :
+                                  stock <= (product.lowStockAlert ?? 0) ? "bg-rose-50 text-rose-700 border-rose-100" :
                                   "bg-emerald-50 text-emerald-700 border-emerald-100"
                                 )}>
                                   {stock} unités
