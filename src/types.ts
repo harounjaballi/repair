@@ -26,6 +26,7 @@ export interface Product {
   compatibleModels?: string;   // Modèles compatibles (ex: "iPhone 11, 11 Pro")
   buyPrice: number;
   sellPrice: number;
+  discount?: number;           // Remise de l'article (montant en DT)
   barcode?: string;
   stock: number;
   isPart?: boolean;            // true = pièce détachée, false = produit/accessoire
