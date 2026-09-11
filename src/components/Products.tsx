@@ -165,7 +165,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     stock: 0,
     reference: '',
     compatibleModels: '',
-    lowStockAlert: 5
+    lowStockAlert: 0
   });
 
   const [buyPriceInput, setBuyPriceInput] = useState('');
@@ -655,7 +655,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         stock: product.stock,
         reference: product.reference || '',
         compatibleModels: product.compatibleModels || '',
-        lowStockAlert: product.lowStockAlert || 5
+        lowStockAlert: product.lowStockAlert ?? 0
       });
       setBuyPriceInput(product.buyPrice.toFixed(3));
       setSellPriceInput(product.sellPrice.toFixed(3));
@@ -672,7 +672,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         stock: 0,
         reference: '',
         compatibleModels: '',
-        lowStockAlert: 5
+        lowStockAlert: 0
       });
       setBuyPriceInput('');
       setSellPriceInput('');
@@ -1020,11 +1020,11 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       <div className="flex items-center gap-2">
                         <span className={cn(
                           "font-medium",
-                          product.stock <= (product.lowStockAlert || 5) ? "text-red-600" : "text-gray-900"
+                          product.stock <= (product.lowStockAlert ?? 0) ? "text-red-600" : "text-gray-900"
                         )}>
                           {product.stock}
                         </span>
-                        {product.stock <= (product.lowStockAlert || 5) && (
+                        {product.stock <= (product.lowStockAlert ?? 0) && (
                           <AlertTriangle className="w-4 h-4 text-red-500" />
                         )}
                         <div className="flex items-center gap-1 ml-1">
