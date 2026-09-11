@@ -103,10 +103,36 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
 
     let buffer = '';
     let lastKeyTime = 0;
+    let burstFast = true;          // true si tous les caractères du buffer sont arrivés à vitesse douchette
+    let commitTimer: ReturnType<typeof setTimeout> | undefined;
+
+    // Valide le contenu du buffer comme un scan (appelé sur Entrée, Tab ou après
+    // une courte pause suivant une rafale rapide — certaines douchettes laser
+    // n'envoient PAS de touche Entrée après le code).
+    const commitScan = (): boolean => {
+      if (commitTimer) { clearTimeout(commitTimer); commitTimer = undefined; }
+      const barcode = decodeAzertyBarcode(buffer.trim());
+      buffer = '';
+      lastKeyTime = 0;
+      burstFast = true;
+
+      if (barcode.length >= 3) {
+        playBeep('success');
+        setFormData(prev => ({ ...prev, barcode }));
+        setScanStatus('scanned');
+        setScanMessage(`Code détecté avec succès : ${barcode}`);
+        setTimeout(() => {
+          setScanStatus('idle');
+          setScanMessage('');
+        }, 4500);
+        return true;
+      }
+      return false;
+    };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
-      if (e.key === 'Tab' || e.key === 'Escape' || e.key === 'ArrowUp' || e.key === 'ArrowDown') return;
+      if (e.key === 'Escape' || e.key === 'ArrowUp' || e.key === 'ArrowDown') return;
 
       const now = Date.now();
       const target = e.target as HTMLElement;
@@ -117,33 +143,39 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       lastKeyTime = now;
 
       if (e.key.length === 1) {
+        if (commitTimer) { clearTimeout(commitTimer); commitTimer = undefined; }
+
         if (isInputFocused && !isBarcodeInputFocused && interval > 120) {
           buffer = e.key;
+          burstFast = true;
           return;
         }
 
         if (interval > 120) {
           buffer = e.key;
+          burstFast = true;
         } else {
           buffer += e.key;
+          if (interval > 80) burstFast = false;
+        }
+
+        // Douchette sans suffixe Entrée : une rafale d'au moins 6 caractères à
+        // vitesse machine suivie d'une courte pause = scan terminé.
+        if (burstFast && buffer.length >= 6) {
+          commitTimer = setTimeout(() => { commitScan(); }, 300);
         }
       } else if (e.key === 'Enter') {
-        const barcode = decodeAzertyBarcode(buffer.trim());
-        buffer = '';
-        lastKeyTime = 0;
-
-        if (barcode.length >= 3) {
-          playBeep('success');
-          setFormData(prev => ({ ...prev, barcode }));
-          setScanStatus('scanned');
-          setScanMessage(`Code détecté avec succès : ${barcode}`);
-          setTimeout(() => {
-            setScanStatus('idle');
-            setScanMessage('');
-          }, 4500);
-
+        if (commitScan()) {
           e.preventDefault();
           e.stopPropagation();
+        }
+      } else if (e.key === 'Tab') {
+        // Certaines douchettes envoient Tab comme suffixe de fin de code.
+        if (burstFast && buffer.length >= 3) {
+          if (commitScan()) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
         }
       }
     };
@@ -151,6 +183,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     window.addEventListener('keydown', handleKeyDown, true);
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
+      if (commitTimer) clearTimeout(commitTimer);
     };
   }, [isModalOpen]);
 
