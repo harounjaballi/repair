@@ -504,7 +504,7 @@ export default function Invoices({ userProfile }: InvoicesProps) {
                           </div>
                           <div className={cn(
                             "text-[8px] sm:text-[10px] font-extrabold uppercase tracking-wider",
-                            product.stock <= (product.lowStockAlert || 5) ? "text-red-500" : "text-green-600"
+                            product.stock <= (product.lowStockAlert ?? 0) ? "text-red-500" : "text-green-600"
                           )}>
                             Stock: {product.stock}
                           </div>
