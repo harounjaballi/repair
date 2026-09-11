@@ -161,6 +161,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     brand: '',
     buyPrice: 0,
     sellPrice: 0,
+    discount: 0,
     barcode: '',
     stock: 0,
     reference: '',
@@ -170,6 +171,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
 
   const [buyPriceInput, setBuyPriceInput] = useState('');
   const [sellPriceInput, setSellPriceInput] = useState('');
+  const [discountInput, setDiscountInput] = useState('');
 
   // Impression d'une étiquette autocollante avec le code-barres du produit :
   // ligne 1 = SmarTECH, ligne 2 = nom du produit, ligne 3 = code-barres.
@@ -651,6 +653,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         brand: product.brand || '',
         buyPrice: product.buyPrice,
         sellPrice: product.sellPrice,
+        discount: product.discount ?? 0,
         barcode: product.barcode || '',
         stock: product.stock,
         reference: product.reference || '',
@@ -659,6 +662,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       });
       setBuyPriceInput(product.buyPrice.toFixed(3));
       setSellPriceInput(product.sellPrice.toFixed(3));
+      setDiscountInput((product.discount ?? 0) === 0 ? '' : (product.discount ?? 0).toFixed(3));
       setIsServiceForm(product.isService === true);
     } else {
       setEditingProduct(null);
@@ -668,6 +672,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         brand: isPartMode ? (brands[0]?.name || '') : '',
         buyPrice: 0,
         sellPrice: 0,
+        discount: 0,
         barcode: '',
         stock: 0,
         reference: '',
@@ -676,6 +681,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
       });
       setBuyPriceInput('');
       setSellPriceInput('');
+      setDiscountInput('');
       setIsServiceForm(false);
     }
     setIsModalOpen(true);
@@ -1368,6 +1374,33 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                     />
                   </div>
+
+                  {!isServiceForm && !isPartMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Remise ({storeSettings?.currency || 'DT'})</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={discountInput}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(',', '.');
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          setDiscountInput(value);
+                          const parsed = parseFloat(value) || 0;
+                          setFormData({ ...formData, discount: Math.round(parsed * 1000) / 1000 });
+                        }
+                      }}
+                      onBlur={() => {
+                        const parsed = parseFloat(discountInput) || 0;
+                        const rounded = Math.round(parsed * 1000) / 1000;
+                        setDiscountInput(rounded === 0 ? '' : rounded.toFixed(3));
+                        setFormData({ ...formData, discount: rounded });
+                      }}
+                      placeholder="0.00"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                    />
+                  </div>
+                  )}
 
                   {!isServiceForm && isPartMode && (
                   <div className={cn(isPartMode && "col-span-2 order-9")}>
