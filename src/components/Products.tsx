@@ -1120,7 +1120,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className={cn("col-span-2", isPartMode && "order-2")}>
+                  <div className={cn(isPartMode ? "col-span-2 order-2" : (isServiceForm ? "col-span-2" : ""))}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{isPartMode ? 'Description' : "Nom de l'article"}</label>
                     <input
                       type="text"
@@ -1130,6 +1130,19 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                     />
                   </div>
+
+                  {!isServiceForm && !isPartMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Référence</label>
+                    <input
+                      type="text"
+                      value={formData.reference}
+                      onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                      placeholder="Ex: REF-001"
+                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none box-border"
+                    />
+                  </div>
+                  )}
 
                   {isPartMode && (
                     <div className="col-span-2 order-3">
@@ -1356,19 +1369,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                     />
                   </div>
 
-                  {!isServiceForm && !isPartMode && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Référence</label>
-                    <input
-                      type="text"
-                      value={formData.reference}
-                      onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                      placeholder="Ex: REF-001"
-                      className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none box-border"
-                    />
-                  </div>
-                  )}
-                  {!isServiceForm && (
+                  {!isServiceForm && isPartMode && (
                   <div className={cn(isPartMode && "col-span-2 order-9")}>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Modèles compatibles</label>
                     <input
