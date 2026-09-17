@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { db, auth } from '../firebase';
@@ -618,20 +618,29 @@ export default function Settings({ userProfile }: SettingsProps) {
     }
   };
 
+  // Le formulaire n'est rempli qu'au PREMIER snapshot : les événements suivants
+  // (cache → serveur, synchro multi-onglets) ne doivent plus écraser les
+  // modifications en cours de saisie (ex: la case TVA qui se recochait toute seule).
+  const formInitializedRef = useRef(false);
+
   useEffect(() => {
+    formInitializedRef.current = false;
     const unsubscribeStore = onSnapshot(doc(db, 'settings', ownerId), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data() as StoreSettings;
         setStoreSettings({ ...data, id: snapshot.id });
-        setStoreFormData({
-          storeName: data.storeName || '',
-          currency: data.currency || '',
-          address: data.address || '',
-          phone: data.phone || '',
-          tva: data.tva !== undefined ? data.tva : 19,
-          tvaEnabled: data.tvaEnabled !== false,
-          deleteCode: data.deleteCode || ''
-        });
+        if (!formInitializedRef.current) {
+          formInitializedRef.current = true;
+          setStoreFormData({
+            storeName: data.storeName || '',
+            currency: data.currency || '',
+            address: data.address || '',
+            phone: data.phone || '',
+            tva: data.tva !== undefined ? data.tva : 19,
+            tvaEnabled: data.tvaEnabled !== false,
+            deleteCode: data.deleteCode || ''
+          });
+        }
       } else {
         setStoreSettings({
           id: ownerId,
@@ -640,15 +649,18 @@ export default function Settings({ userProfile }: SettingsProps) {
           tva: 19,
           tvaEnabled: true
         } as StoreSettings);
-        setStoreFormData({
-          storeName: 'SmarTech Solution',
-          currency: 'DT',
-          address: '',
-          phone: '',
-          tva: 19,
-          tvaEnabled: true,
-          deleteCode: ''
-        });
+        if (!formInitializedRef.current) {
+          formInitializedRef.current = true;
+          setStoreFormData({
+            storeName: 'SmarTech Solution',
+            currency: 'DT',
+            address: '',
+            phone: '',
+            tva: 19,
+            tvaEnabled: true,
+            deleteCode: ''
+          });
+        }
       }
       setLoading(false);
     }, (error) => {
@@ -661,13 +673,17 @@ export default function Settings({ userProfile }: SettingsProps) {
     };
   }, [ownerId]);
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const handleStoreSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
     try {
       await setDoc(doc(db, 'settings', ownerId), storeFormData);
       setSuccess('Paramètres du magasin enregistrés avec succès !');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
+      setSaveError("Échec de l'enregistrement des paramètres. Vérifiez votre connexion puis réessayez.");
       handleFirestoreError(error, OperationType.WRITE, `settings/${ownerId}`);
     }
   };
@@ -785,6 +801,13 @@ export default function Settings({ userProfile }: SettingsProps) {
                     )}
                   />
                 </div>
+
+                {saveError && (
+                  <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-xl">
+                    <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-red-600 font-semibold">{saveError}</p>
+                  </div>
+                )}
 
                 <div className="pt-2">
                   <button
