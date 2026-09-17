@@ -708,9 +708,34 @@ export default function Settings({ userProfile }: SettingsProps) {
 
       // Relecture DIRECTE depuis le serveur pour vérifier que la valeur est bien persistée.
       const confirmSnap = await getDocFromServer(doc(db, 'settings', ownerId));
-      const savedTvaEnabled = confirmSnap.data()?.tvaEnabled;
-      if (savedTvaEnabled !== payload.tvaEnabled) {
-        setSaveError(`Anomalie : le serveur a renvoyé une valeur TVA différente de celle enregistrée (reçu: ${JSON.stringify(savedTvaEnabled)}). Contactez le support avec ce message.`);
+      const serverData = confirmSnap.exists() ? (confirmSnap.data() as Record<string, unknown>) : null;
+
+      if (!serverData || serverData.tvaEnabled !== payload.tvaEnabled) {
+        // Le document a été réécrit/écrasé juste après notre enregistrement.
+        // Tentative de réparation ciblée : on attend, on réécrit UNIQUEMENT le champ TVA, on revérifie.
+        await new Promise((r) => setTimeout(r, 1500));
+        if (confirmSnap.exists()) {
+          await updateDoc(doc(db, 'settings', ownerId), { tvaEnabled: payload.tvaEnabled });
+        } else {
+          await setDoc(doc(db, 'settings', ownerId), payload);
+        }
+        const secondSnap = await getDocFromServer(doc(db, 'settings', ownerId));
+        const secondData = secondSnap.exists() ? (secondSnap.data() as Record<string, unknown>) : null;
+
+        if (!secondData || secondData.tvaEnabled !== payload.tvaEnabled) {
+          // Toujours écrasé : on affiche le document tel que le serveur le renvoie (code de suppression masqué).
+          const dump = secondData
+            ? JSON.stringify({ ...secondData, deleteCode: secondData.deleteCode ? '****' : '' })
+            : 'DOCUMENT INEXISTANT';
+          setSaveError(
+            `Anomalie confirmée : un autre appareil/onglet connecté réécrit le document des paramètres juste après l'enregistrement. ` +
+            `Document renvoyé par le serveur : ${dump}. ` +
+            `Fermez l'application sur TOUS les autres appareils et onglets (PC de la boutique, téléphone...), rechargez cette page, puis réessayez.`
+          );
+          return;
+        }
+        setSuccess('Paramètres enregistrés (après une 2e tentative) et confirmés par le serveur !');
+        setTimeout(() => setSuccess(null), 4000);
         return;
       }
 
