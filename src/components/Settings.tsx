@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, getDocFromServer, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { StoreSettings, UserProfile } from '../types';
@@ -201,8 +201,6 @@ export default function Settings({ userProfile }: SettingsProps) {
     currency: '',
     address: '',
     phone: '',
-    tva: 19,
-    tvaEnabled: true,
     deleteCode: ''
   });
 
@@ -325,10 +323,9 @@ export default function Settings({ userProfile }: SettingsProps) {
           'Date & Heure': dt ? fmtDateTime(dt) : '',
           'Référence': s.id,
           'Client': s.clientName || 'Client de passage',
-          'Total TTC (DT)': s.total || 0,
+          'Total (DT)': s.total || 0,
           'Payé (DT)': s.paid || 0,
           'Dette (DT)': s.debt || 0,
-          'TVA (DT)': s.tva || 0,
           'Facture associée': s.invoiceId || 'N/A',
           'Détail des articles': itemsString
         };
@@ -342,10 +339,9 @@ export default function Settings({ userProfile }: SettingsProps) {
           'Numéro de facture': inv.number || inv.id,
           'Client': inv.clientName || '',
           'Téléphone': inv.clientPhone || '',
-          'Total TTC (DT)': inv.total || 0,
+          'Total (DT)': inv.total || 0,
           'Payé (DT)': inv.paid || 0,
           'Dette (DT)': inv.debt || 0,
-          'TVA (DT)': inv.tva || 0,
           'Détail des articles': itemsString
         };
       });
@@ -353,7 +349,6 @@ export default function Settings({ userProfile }: SettingsProps) {
       const totalCA = salesInRange.reduce((sum, s) => sum + (s.total || 0), 0);
       const totalPaye = salesInRange.reduce((sum, s) => sum + (s.paid || 0), 0);
       const totalDette = salesInRange.reduce((sum, s) => sum + (s.debt || 0), 0);
-      const totalTva = salesInRange.reduce((sum, s) => sum + (s.tva || 0), 0);
 
       const resume = [
         { 'Indicateur': 'Magasin', 'Valeur': storeFormData.storeName || 'Magasin' },
@@ -364,7 +359,6 @@ export default function Settings({ userProfile }: SettingsProps) {
         { 'Indicateur': "Chiffre d'affaires total (DT)", 'Valeur': totalCA.toFixed(2) },
         { 'Indicateur': 'Total encaissé (DT)', 'Valeur': totalPaye.toFixed(2) },
         { 'Indicateur': 'Total dettes générées (DT)', 'Valeur': totalDette.toFixed(2) },
-        { 'Indicateur': 'Total TVA collectée (DT)', 'Valeur': totalTva.toFixed(2) },
         { 'Indicateur': 'Date de génération', 'Valeur': fmtDateTime(new Date()) }
       ];
 
@@ -501,10 +495,9 @@ export default function Settings({ userProfile }: SettingsProps) {
           'ID de la Vente': doc.id,
           'Date': formattedDate,
           'Client': d.clientName || 'Client de passage',
-          'Total TTC (DT)': d.total || 0,
+          'Total (DT)': d.total || 0,
           'Montant payé (DT)': d.paid || 0,
           'Dette restante (DT)': d.debt || 0,
-          'Montant TVA (DT)': d.tva || 0,
           'ID Facture associée': d.invoiceId || 'N/A',
           'Détail des Articles': itemsString
         };
@@ -528,7 +521,6 @@ export default function Settings({ userProfile }: SettingsProps) {
           'Total Facture (DT)': d.total || 0,
           'Payé (DT)': d.paid || 0,
           'Dette (DT)': d.debt || 0,
-          'TVA (DT)': d.tva || 0,
           'Date de Facturation': formattedDate,
           'Articles': itemsString
         };
@@ -620,13 +612,8 @@ export default function Settings({ userProfile }: SettingsProps) {
 
   // Le formulaire n'est rempli qu'au PREMIER snapshot : les événements suivants
   // (cache → serveur, synchro multi-onglets) ne doivent plus écraser les
-  // modifications en cours de saisie (ex: la case TVA qui se recochait toute seule).
+  // modifications en cours de saisie.
   const formInitializedRef = useRef(false);
-
-  // Interprétation tolérante de la valeur stockée : false, "false" (chaîne créée
-  // par ex. depuis la console Firebase) et 0 signifient tous « TVA désactivée ».
-  const readTvaEnabled = (v: unknown): boolean =>
-    !(v === false || v === 'false' || v === 0 || v === '0');
 
   useEffect(() => {
     formInitializedRef.current = false;
@@ -641,8 +628,6 @@ export default function Settings({ userProfile }: SettingsProps) {
             currency: data.currency || '',
             address: data.address || '',
             phone: data.phone || '',
-            tva: data.tva !== undefined ? Number(data.tva) : 19,
-            tvaEnabled: readTvaEnabled(data.tvaEnabled),
             deleteCode: data.deleteCode || ''
           });
         }
@@ -650,9 +635,7 @@ export default function Settings({ userProfile }: SettingsProps) {
         setStoreSettings({
           id: ownerId,
           storeName: 'SmarTech Solution',
-          currency: 'DT',
-          tva: 19,
-          tvaEnabled: true
+          currency: 'DT'
         } as StoreSettings);
         if (!formInitializedRef.current) {
           formInitializedRef.current = true;
@@ -661,8 +644,6 @@ export default function Settings({ userProfile }: SettingsProps) {
             currency: 'DT',
             address: '',
             phone: '',
-            tva: 19,
-            tvaEnabled: true,
             deleteCode: ''
           });
         }
@@ -687,59 +668,8 @@ export default function Settings({ userProfile }: SettingsProps) {
     setSuccess(null);
     setSaving(true);
     try {
-      // Types stricts : booléen pour tvaEnabled, nombre pour tva.
-      const payload = {
-        ...storeFormData,
-        tva: Number(storeFormData.tva) || 0,
-        tvaEnabled: storeFormData.tvaEnabled === true
-      };
-
-      // setDoc ne se résout qu'après confirmation du serveur. S'il reste bloqué
-      // (connexion Firestore instable), on le détecte au lieu d'attendre sans fin.
-      const result = await Promise.race([
-        setDoc(doc(db, 'settings', ownerId), payload).then(() => 'ok' as const),
-        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 10000))
-      ]);
-
-      if (result === 'timeout') {
-        setSaveError("Le serveur n'a pas confirmé l'enregistrement (connexion instable ?). La modification est en attente de synchronisation — vérifiez votre connexion Internet puis réessayez.");
-        return;
-      }
-
-      // Relecture DIRECTE depuis le serveur pour vérifier que la valeur est bien persistée.
-      const confirmSnap = await getDocFromServer(doc(db, 'settings', ownerId));
-      const serverData = confirmSnap.exists() ? (confirmSnap.data() as Record<string, unknown>) : null;
-
-      if (!serverData || serverData.tvaEnabled !== payload.tvaEnabled) {
-        // Le document a été réécrit/écrasé juste après notre enregistrement.
-        // Tentative de réparation ciblée : on attend, on réécrit UNIQUEMENT le champ TVA, on revérifie.
-        await new Promise((r) => setTimeout(r, 1500));
-        if (confirmSnap.exists()) {
-          await updateDoc(doc(db, 'settings', ownerId), { tvaEnabled: payload.tvaEnabled });
-        } else {
-          await setDoc(doc(db, 'settings', ownerId), payload);
-        }
-        const secondSnap = await getDocFromServer(doc(db, 'settings', ownerId));
-        const secondData = secondSnap.exists() ? (secondSnap.data() as Record<string, unknown>) : null;
-
-        if (!secondData || secondData.tvaEnabled !== payload.tvaEnabled) {
-          // Toujours écrasé : on affiche le document tel que le serveur le renvoie (code de suppression masqué).
-          const dump = secondData
-            ? JSON.stringify({ ...secondData, deleteCode: secondData.deleteCode ? '****' : '' })
-            : 'DOCUMENT INEXISTANT';
-          setSaveError(
-            `Anomalie confirmée : un autre appareil/onglet connecté réécrit le document des paramètres juste après l'enregistrement. ` +
-            `Document renvoyé par le serveur : ${dump}. ` +
-            `Fermez l'application sur TOUS les autres appareils et onglets (PC de la boutique, téléphone...), rechargez cette page, puis réessayez.`
-          );
-          return;
-        }
-        setSuccess('Paramètres enregistrés (après une 2e tentative) et confirmés par le serveur !');
-        setTimeout(() => setSuccess(null), 4000);
-        return;
-      }
-
-      setSuccess('Paramètres du magasin enregistrés et confirmés par le serveur !');
+      await setDoc(doc(db, 'settings', ownerId), storeFormData);
+      setSuccess('Paramètres du magasin enregistrés avec succès !');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
       setSaveError("Échec de l'enregistrement des paramètres (refus du serveur ou connexion coupée). Vérifiez votre connexion puis réessayez.");
@@ -758,7 +688,7 @@ export default function Settings({ userProfile }: SettingsProps) {
             Paramètres du Magasin
           </h1>
           <p className="text-xs text-slate-500 font-medium">
-            Configurez les informations d'en-tête, la devise, les coordonnées de contact et la gestion de la TVA.
+            Configurez les informations d'en-tête, la devise et les coordonnées de contact.
           </p>
         </div>
       </div>
@@ -832,35 +762,6 @@ export default function Settings({ userProfile }: SettingsProps) {
                       placeholder="Ex: 71 000 000 ou 22 123 456"
                     />
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-2xl border border-slate-100 my-2">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 block">Facturation de la TVA</label>
-                    <span className="text-[10px] text-slate-400 font-medium block leading-tight mt-0.5">Calculer et appliquer la taxe sur la valeur ajoutée sur les ventes</span>
-                  </div>
-                  <input 
-                    type="checkbox"
-                    checked={storeFormData.tvaEnabled}
-                    onChange={(e) => setStoreFormData({ ...storeFormData, tvaEnabled: e.target.checked })}
-                    className="w-5 h-5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-bold">Taux de TVA (%)</label>
-                  <input 
-                    type="number" 
-                    disabled={!storeFormData.tvaEnabled}
-                    value={storeFormData.tva}
-                    onChange={(e) => setStoreFormData({ ...storeFormData, tva: Number(e.target.value) })}
-                    className={cn(
-                      "w-full px-4 py-2.5 border rounded-xl text-xs font-semibold transition-all outline-none",
-                      storeFormData.tvaEnabled
-                        ? "bg-white border-indigo-200 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500" 
-                        : "bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed opacity-60"
-                    )}
-                  />
                 </div>
 
                 {saveError && (
