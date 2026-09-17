@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, getDocFromServer, query, where, deleteDoc } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { StoreSettings, UserProfile } from '../types';
@@ -623,6 +623,11 @@ export default function Settings({ userProfile }: SettingsProps) {
   // modifications en cours de saisie (ex: la case TVA qui se recochait toute seule).
   const formInitializedRef = useRef(false);
 
+  // Interprétation tolérante de la valeur stockée : false, "false" (chaîne créée
+  // par ex. depuis la console Firebase) et 0 signifient tous « TVA désactivée ».
+  const readTvaEnabled = (v: unknown): boolean =>
+    !(v === false || v === 'false' || v === 0 || v === '0');
+
   useEffect(() => {
     formInitializedRef.current = false;
     const unsubscribeStore = onSnapshot(doc(db, 'settings', ownerId), (snapshot) => {
@@ -636,8 +641,8 @@ export default function Settings({ userProfile }: SettingsProps) {
             currency: data.currency || '',
             address: data.address || '',
             phone: data.phone || '',
-            tva: data.tva !== undefined ? data.tva : 19,
-            tvaEnabled: data.tvaEnabled !== false,
+            tva: data.tva !== undefined ? Number(data.tva) : 19,
+            tvaEnabled: readTvaEnabled(data.tvaEnabled),
             deleteCode: data.deleteCode || ''
           });
         }
@@ -674,17 +679,48 @@ export default function Settings({ userProfile }: SettingsProps) {
   }, [ownerId]);
 
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const handleStoreSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveError(null);
+    setSuccess(null);
+    setSaving(true);
     try {
-      await setDoc(doc(db, 'settings', ownerId), storeFormData);
-      setSuccess('Paramètres du magasin enregistrés avec succès !');
+      // Types stricts : booléen pour tvaEnabled, nombre pour tva.
+      const payload = {
+        ...storeFormData,
+        tva: Number(storeFormData.tva) || 0,
+        tvaEnabled: storeFormData.tvaEnabled === true
+      };
+
+      // setDoc ne se résout qu'après confirmation du serveur. S'il reste bloqué
+      // (connexion Firestore instable), on le détecte au lieu d'attendre sans fin.
+      const result = await Promise.race([
+        setDoc(doc(db, 'settings', ownerId), payload).then(() => 'ok' as const),
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 10000))
+      ]);
+
+      if (result === 'timeout') {
+        setSaveError("Le serveur n'a pas confirmé l'enregistrement (connexion instable ?). La modification est en attente de synchronisation — vérifiez votre connexion Internet puis réessayez.");
+        return;
+      }
+
+      // Relecture DIRECTE depuis le serveur pour vérifier que la valeur est bien persistée.
+      const confirmSnap = await getDocFromServer(doc(db, 'settings', ownerId));
+      const savedTvaEnabled = confirmSnap.data()?.tvaEnabled;
+      if (savedTvaEnabled !== payload.tvaEnabled) {
+        setSaveError(`Anomalie : le serveur a renvoyé une valeur TVA différente de celle enregistrée (reçu: ${JSON.stringify(savedTvaEnabled)}). Contactez le support avec ce message.`);
+        return;
+      }
+
+      setSuccess('Paramètres du magasin enregistrés et confirmés par le serveur !');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      setSaveError("Échec de l'enregistrement des paramètres. Vérifiez votre connexion puis réessayez.");
+      setSaveError("Échec de l'enregistrement des paramètres (refus du serveur ou connexion coupée). Vérifiez votre connexion puis réessayez.");
       handleFirestoreError(error, OperationType.WRITE, `settings/${ownerId}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -812,10 +848,11 @@ export default function Settings({ userProfile }: SettingsProps) {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-indigo-600/10 active:scale-[0.99]"
+                    disabled={saving}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-indigo-600/10 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Save className="w-4 h-4" />
-                    Enregistrer les modifications
+                    {saving ? 'Enregistrement en cours...' : 'Enregistrer les modifications'}
                   </button>
                 </div>
               </form>
