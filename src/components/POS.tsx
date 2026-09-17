@@ -461,13 +461,10 @@ export default function POS({ userProfile }: POSProps) {
     return Math.round(rawSum * 1000) / 1000;
   }, [cart]);
   const currency = storeSettings?.currency || 'DT';
-  const tvaRate = storeSettings?.tvaEnabled !== false ? (storeSettings?.tva || 19) / 100 : 0;
-  const tvaAmount = Math.round(subtotal * tvaRate * 1000) / 1000;
 
   const cartTotal = useMemo(() => {
-    const totalWithTva = subtotal + tvaAmount;
-    return Math.max(0, Math.round((totalWithTva - discount) * 1000) / 1000);
-  }, [subtotal, tvaAmount, discount]);
+    return Math.max(0, Math.round((subtotal - discount) * 1000) / 1000);
+  }, [subtotal, discount]);
 
   useEffect(() => {
     setReceivedCash(cartTotal);
@@ -664,7 +661,6 @@ export default function POS({ userProfile }: POSProps) {
             total: cartTotal,
             paid: effPaid,
             debt: effDebt,
-            tva: tvaAmount,
             items: cart,
             invoiceId: invoiceRef.id,
             ownerId,
@@ -683,7 +679,6 @@ export default function POS({ userProfile }: POSProps) {
             total: cartTotal,
             paid: effPaid,
             debt: effDebt,
-            tva: tvaAmount,
             date: serverTimestamp(),
             items: cart,
             ownerId,
@@ -1174,9 +1169,6 @@ export default function POS({ userProfile }: POSProps) {
                 <div className="flex flex-col gap-1 text-center animate-in fade-in duration-200">
                   <div className="flex items-center justify-between text-blue-700 font-black text-[9px] uppercase tracking-widest pb-1 border-b border-slate-200">
                     <span>Total Net à payer</span>
-                    <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 text-[8px]">
-                      {storeSettings?.tvaEnabled !== false ? `TVA (${storeSettings?.tva || 19}%)` : 'Hors taxe'}
-                    </span>
                   </div>
                   <div className="flex justify-center items-center gap-1 mt-1.5">
                     <span className="text-3xl sm:text-4xl font-black font-mono tracking-tighter text-blue-700 leading-none drop-shadow-sm select-all">
