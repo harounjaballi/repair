@@ -270,7 +270,7 @@ export default function Sales({ userProfile }: SalesProps) {
     return unsubscribe;
   }, [userProfile]);
 
-  // Résout le code saisi (code-barres, ID ou nom) vers les identifiants de produits correspondants
+  // Résout le code saisi (code-barres, ID, référence ou nom) vers les identifiants de produits correspondants
   const matchedProductIds = (() => {
     const code = productCode.trim().toLowerCase();
     if (!code) return null;
@@ -279,6 +279,7 @@ export default function Sales({ userProfile }: SalesProps) {
       if (
         (p.barcode && p.barcode.toLowerCase() === code) ||
         p.id.toLowerCase() === code ||
+        (p.reference && p.reference.toLowerCase() === code) ||
         p.name.toLowerCase().includes(code)
       ) {
         ids.add(p.id);
@@ -377,14 +378,14 @@ export default function Sales({ userProfile }: SalesProps) {
           <div className="w-full sm:max-w-md">
             <label className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500 mb-1.5 flex items-center gap-1.5">
               <Package className="w-3.5 h-3.5" />
-              Historique par code produit
+              Historique par code / référence
             </label>
             <div className="relative">
               <Package className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 name="product-code-search"
-                placeholder="Code-barres, ID ou nom du produit…"
+                placeholder="Code-barres, ID, référence ou nom du produit…"
                 value={productCode}
                 onChange={(e) => setProductCode(e.target.value)}
                 autoComplete="off"
