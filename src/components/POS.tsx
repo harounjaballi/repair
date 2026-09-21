@@ -255,8 +255,9 @@ export default function POS({ userProfile }: POSProps) {
         p.barcode.toLowerCase().includes(searchLower) || 
         (decodedSearch && p.barcode.toLowerCase().includes(decodedSearch))
       ) : false;
+      const matchesReference = p.reference ? p.reference.toLowerCase().includes(searchLower) : false;
       
-      return (matchesName || matchesBarcode) && 
+      return (matchesName || matchesBarcode || matchesReference) && 
              (selectedCategory === 'all' || p.category === selectedCategory) &&
              (isService(p) || p.stock > 0);
     }).sort((a, b) => {
@@ -821,7 +822,7 @@ export default function POS({ userProfile }: POSProps) {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Rechercher nom ou code barre..."
+              placeholder="Rechercher nom, code barre ou référence..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handleSearchKeyDown}
