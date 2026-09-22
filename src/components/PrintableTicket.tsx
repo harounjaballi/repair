@@ -43,45 +43,78 @@ export const PrintableTicket = forwardRef<HTMLDivElement, Props>(({ invoice, own
   const currency = storeSettings?.currency || 'DT';
 
   return (
-    <div ref={ref} className="p-5 w-[80mm] mx-auto bg-white text-black font-mono text-[12px] leading-tight">
-      <div className="text-center font-bold text-[16px] uppercase">{storeName}</div>
-      <div className="text-center">{storeAddress}</div>
-      {storePhone && <div className="text-center">Tél: {storePhone}</div>}
+    <div ref={ref} className="p-2 w-[40mm] mx-auto bg-white text-black font-mono text-[9px] leading-tight">
+      {/* Titre SmarTech */}
+      <div className="text-center font-bold text-[14px] uppercase tracking-wider mb-1">SmarTech</div>
       <div className="border-t border-dashed border-black my-1"></div>
-      <div className="text-center font-bold">TICKET DE CAISSE</div>
+      
+      {/* Date et heure */}
+      <div className="text-center text-[8px] font-semibold">{dateStr}</div>
+      
+      {/* Code à barre et infos produit pour chaque article */}
       <div className="border-t border-dashed border-black my-1"></div>
-      <div>Date: {dateStr}</div>
-      <div>Ticket: {invoice.number}</div>
-      <div>Client: {invoice.clientName}</div>
-      <div className="border-t border-dashed border-black my-1"></div>
-      <div className="my-2 space-y-1">
+      <div className="my-2 space-y-2">
         {invoice.items.map((item, index) => (
-          <div key={index}>
-            <div className="flex justify-between">
-              <span className="max-w-[40mm] overflow-hidden text-ellipsis whitespace-nowrap">{item.name}</span>
-              <span>{item.quantity} x {item.price.toFixed(3)}</span>
+          <div key={index} className="border-b border-dashed border-gray-300 pb-1">
+            {/* Code à barre si disponible */}
+            {item.barcode && (
+              <div className="text-center my-0.5">
+                <div className="font-bold text-[8px] tracking-widest break-all">{item.barcode}</div>
+              </div>
+            )}
+            
+            {/* Nom de l'article */}
+            <div className="font-bold text-[9px] text-center break-words mb-0.5">
+              {item.name}
             </div>
-            <div className="text-right">{item.total.toFixed(3)} {currency}</div>
+            
+            {/* Référence si disponible */}
+            {item.reference && (
+              <div className="text-center text-[7px] text-gray-700 mb-0.5 font-semibold">
+                Réf: {item.reference}
+              </div>
+            )}
+            
+            {/* Quantité et prix */}
+            <div className="flex justify-between text-[8px] font-semibold">
+              <span>{item.quantity}x {item.price.toFixed(3)}</span>
+              <span>{item.total.toFixed(3)} {currency}</span>
+            </div>
           </div>
         ))}
       </div>
+      
       <div className="border-t border-dashed border-black my-1"></div>
-      <div className="flex justify-between font-bold">
+      
+      {/* Infos facture */}
+      <div className="text-center text-[7px] mb-1 space-y-0.5">
+        <div className="font-semibold">#{invoice.number}</div>
+        <div className="font-semibold">{invoice.clientName}</div>
+      </div>
+      
+      <div className="border-t border-dashed border-black my-1"></div>
+      
+      {/* Total et paiement */}
+      <div className="flex justify-between font-bold text-[9px] mb-0.5">
         <span>TOTAL</span>
         <span>{invoice.total.toFixed(3)} {currency}</span>
       </div>
-      <div className="flex justify-between">
+      <div className="flex justify-between text-[8px] mb-0.5">
         <span>Payé</span>
-        <span>{invoice.paid.toFixed(3)} {currency}</span>
+        <span className="font-semibold">{invoice.paid.toFixed(3)}</span>
       </div>
-      <div className="flex justify-between">
-        <span>Reste</span>
-        <span>{invoice.debt.toFixed(3)} {currency}</span>
-      </div>
+      {invoice.debt > 0 && (
+        <div className="flex justify-between text-[8px] text-red-600 font-bold">
+          <span>Reste</span>
+          <span>{invoice.debt.toFixed(3)}</span>
+        </div>
+      )}
+      
       <div className="border-t border-dashed border-black my-1"></div>
-      <div className="text-center mt-5 text-[10px]">
-        Merci de votre visite !<br />
-        À bientôt chez {storeName}
+      
+      {/* Footer */}
+      <div className="text-center mt-1 text-[7px] leading-tight">
+        Merci !
       </div>
     </div>
   );
