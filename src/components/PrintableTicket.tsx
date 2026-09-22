@@ -1,8 +1,9 @@
-import React, { forwardRef, useEffect, useState } from 'react';
+import React, { forwardRef, useEffect, useState, useRef } from 'react';
 import { format } from 'date-fns';
 import { Invoice, StoreSettings } from '../types';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
+import JsBarcode from 'jsbarcode';
 
 interface Props {
   invoice: Invoice;
@@ -11,6 +12,7 @@ interface Props {
 
 export const PrintableTicket = forwardRef<HTMLDivElement, Props>(({ invoice, ownerId }, ref) => {
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
+  const barcodesRef = useRef<SVGSVGElement[]>([]);
 
   useEffect(() => {
     const finalOwnerId = ownerId || invoice.ownerId || 'store';
@@ -21,6 +23,25 @@ export const PrintableTicket = forwardRef<HTMLDivElement, Props>(({ invoice, own
     });
     return unsubscribe;
   }, [ownerId, invoice.ownerId]);
+
+  // Générer les codes-barres
+  useEffect(() => {
+    barcodesRef.current.forEach((svg, i) => {
+      if (svg && invoice.items[i]?.barcode) {
+        try {
+          JsBarcode(svg, invoice.items[i].barcode, {
+            format: 'CODE128',
+            width: 1.2,
+            height: 18,
+            displayValue: false,
+            margin: 0
+          });
+        } catch (e) {
+          console.error('Erreur barcode:', e);
+        }
+      }
+    });
+  }, [invoice.items]);
 
   let dateStr = '';
   try {
@@ -59,8 +80,20 @@ export const PrintableTicket = forwardRef<HTMLDivElement, Props>(({ invoice, own
       <div style={{ borderTop: '1px solid black', margin: '1px 0' }}></div>
       
       {invoice.items.slice(0, 1).map((item, i) => (
-        <div key={i} style={{ overflow: 'hidden' }}>
-          {item.barcode && <div style={{ textAlign: 'center', fontSize: '7px', fontWeight: 'bold', marginBottom: '0.5px', wordBreak: 'break-all' }}>{item.barcode}</div>}
+        <div key={i} style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {item.barcode && (
+            <svg 
+              ref={(el) => {
+                if (el) barcodesRef.current[i] = el;
+              }}
+              style={{ 
+                maxWidth: '35mm', 
+                maxHeight: '11px', 
+                marginBottom: '0.5px',
+                display: 'block'
+              }}
+            ></svg>
+          )}
           <div style={{ textAlign: 'center', fontSize: '8px', fontWeight: 'bold', marginBottom: '0.5px' }}>{item.name.substring(0, 18)}</div>
           {item.reference && <div style={{ textAlign: 'center', fontSize: '7px', marginBottom: '0.5px' }}>Réf: {item.reference}</div>}
           <div style={{ textAlign: 'center', fontSize: '8px', fontWeight: 'bold' }}>{item.total.toFixed(3)} {currency}</div>
