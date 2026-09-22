@@ -199,7 +199,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     stock: 0,
     reference: '',
     compatibleModels: '',
-    lowStockAlert: 0
+    lowStockAlert: 0,
+    characteristics: ''
   });
 
   const [buyPriceInput, setBuyPriceInput] = useState('');
@@ -712,7 +713,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         stock: product.stock,
         reference: product.reference || '',
         compatibleModels: product.compatibleModels || '',
-        lowStockAlert: product.lowStockAlert ?? 0
+        lowStockAlert: product.lowStockAlert ?? 0,
+        characteristics: product.characteristics || ''
       });
       setBuyPriceInput(product.buyPrice.toFixed(3));
       setSellPriceInput(product.sellPrice.toFixed(3));
@@ -731,7 +733,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         stock: 0,
         reference: '',
         compatibleModels: '',
-        lowStockAlert: 0
+        lowStockAlert: 0,
+        characteristics: ''
       });
       setBuyPriceInput('');
       setSellPriceInput('');
@@ -1054,6 +1057,11 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                             Ref: {product.barcode}
                           </div>
                         )}
+                        {product.characteristics && (
+                          <div className="text-[10px] text-slate-600 bg-slate-50 px-1.5 py-0.5 rounded mt-0.5">
+                            💻 {product.characteristics}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -1331,6 +1339,22 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       </button>
                     </div>
                   </div>
+
+                  {/* Zone Caractéristiques PC - Affichée si catégorie contient "PC" */}
+                  {formData.category.toUpperCase().includes('PC') && (
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        💻 Caractéristiques du PC
+                      </label>
+                      <textarea
+                        value={formData.characteristics || ''}
+                        onChange={(e) => setFormData({ ...formData, characteristics: e.target.value })}
+                        placeholder="Ex: Intel i7, 16GB RAM, SSD 512GB, RTX 3060, Win 11..."
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-800 bg-white resize-none h-20"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Listez les spécifications principales du PC</p>
+                    </div>
+                  )}
 
                   {!isPartMode && (
                     <div className="col-span-2">
