@@ -1091,7 +1091,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
             <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '1px' }}>SmarTech</div>
             <div style={{ borderTop: '1px solid black', margin: '1px 0' }}></div>
             <div style={{ fontSize: '6px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '0.5px', lineHeight: '1.2' }}>
-              {'█'.repeat(Math.ceil(printingLabel.barcode.length / 2))}
+              {'*'.repeat(printingLabel.barcode.length)}
             </div>
             <div style={{ fontSize: '6px', fontWeight: 'bold', wordBreak: 'break-all', marginBottom: '0.5px', maxWidth: '35mm' }}>
               {printingLabel.barcode}
