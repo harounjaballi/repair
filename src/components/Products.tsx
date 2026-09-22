@@ -214,9 +214,30 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     if (!formData.barcode) return;
     setPrintingLabel({ name: formData.name, barcode: formData.barcode });
     setTimeout(() => {
-      window.print();
-      setTimeout(() => setPrintingLabel(null), 500);
-    }, 150);
+      try {
+        // Désactiver les marges et les entêtes/pieds de page
+        const printWindow = window;
+        if (printWindow.matchMedia) {
+          const style = document.createElement('style');
+          style.media = 'print';
+          style.innerHTML = `
+            @page {
+              size: 40mm 30mm;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+            }
+          `;
+          document.head.appendChild(style);
+        }
+        window.print();
+        setTimeout(() => setPrintingLabel(null), 1000);
+      } catch (e) {
+        console.error('Erreur impression:', e);
+      }
+    }, 200);
   };
   // Case « C'est un service » : masque prix d'achat / stock / alerte et
   // n'enregistre ni dépense ni mouvement de stock.
@@ -2047,23 +2068,80 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         </div>
       )}
 
-      {/* Étiquette autocollante code-barres (impression) — format 50 × 30 mm */}
+      {/* Étiquette autocollante code-barres (impression) — format 40 × 30 mm */}
       {printingLabel && createPortal(
         <div className="print-container">
           <style>{`
-            @media print {
-              @page { size: 50mm 30mm; margin: 0 !important; }
+            @page {
+              size: 40mm 30mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
             }
-            .barcode-label-print svg{max-width:100%;height:auto;display:block;margin:0 auto}
+            @media print {
+              body, html {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 40mm !important;
+                height: 30mm !important;
+                background: white !important;
+              }
+              * {
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+              }
+              .print-container {
+                width: 40mm !important;
+                height: 30mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+              }
+              .barcode-label-print {
+                width: 40mm !important;
+                height: 30mm !important;
+                margin: 0 !important;
+                padding: 2px !important;
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
+                page-break-before: avoid !important;
+                orphans: 1 !important;
+                widows: 1 !important;
+                break-after: avoid !important;
+                break-inside: avoid !important;
+                break-before: avoid !important;
+              }
+              .barcode-label-print svg {
+                max-width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+            }
           `}</style>
           <div
             className="barcode-label-print bg-white text-black font-sans"
-            style={{ width: '50mm', height: '30mm', margin: 0, textAlign: 'center', padding: '1mm 1.5mm 0', boxSizing: 'border-box', overflow: 'hidden' }}
+            style={{ 
+              width: '40mm', 
+              height: '30mm', 
+              margin: 0, 
+              padding: '2px',
+              textAlign: 'center', 
+              boxSizing: 'border-box', 
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '2px'
+            }}
           >
-            <div style={{ fontWeight: 900, fontSize: '13px', letterSpacing: '0.5px', lineHeight: 1.1 }}>SmarTECH</div>
-            <div style={{ fontSize: '10px', fontWeight: 700, lineHeight: 1.1, marginTop: '0.5mm', wordBreak: 'break-word', maxHeight: '7mm', overflow: 'hidden' }}>{printingLabel.name || '—'}</div>
-            <div style={{ marginTop: '0.5mm' }}>
-              <BarcodeLabel value={printingLabel.barcode} height={30} moduleWidth={1.2} />
+            <div style={{ fontWeight: 900, fontSize: '11px', letterSpacing: '0.3px', lineHeight: 1, flexShrink: 0 }}>SmarTECH</div>
+            <div style={{ fontSize: '8px', fontWeight: 700, lineHeight: 1.1, wordBreak: 'break-word', maxHeight: '6mm', overflow: 'hidden', flexShrink: 0 }}>{printingLabel.name || '—'}</div>
+            <div style={{ flexShrink: 0, maxWidth: '100%' }}>
+              <BarcodeLabel value={printingLabel.barcode} height={20} moduleWidth={1} />
             </div>
           </div>
         </div>,
