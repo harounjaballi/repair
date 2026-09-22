@@ -44,7 +44,7 @@ export const PrintableTicket = forwardRef<HTMLDivElement, Props>(({ invoice, own
 
   return (
     <div ref={ref} className="bg-white text-black font-mono" style={{ 
-      width: '80mm', 
+      width: '40mm', 
       height: '30mm', 
       margin: '0 auto', 
       padding: '4px',
