@@ -2118,7 +2118,27 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
           }}>
             <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '1px' }}>SmarTech</div>
             <div style={{ borderTop: '1px solid black', margin: '1px 0' }}></div>
-            <div style={{ fontSize: '7px', fontWeight: 'bold', wordBreak: 'break-all', marginBottom: '0.5px' }}>{printingLabel.barcode}</div>
+            {/* CODE-BARRES VISUEL ASCII */}
+<div style={{ 
+  fontSize: '6px', 
+  fontWeight: 'bold',
+  letterSpacing: '1px',
+  marginBottom: '0.5px',
+  lineHeight: '1.2'
+}}>
+  {'█'.repeat(Math.ceil(printingLabel.barcode.length / 2))}
+</div>
+
+{/* NUMÉRO DU CODE-BARRES */}
+<div style={{ 
+  fontSize: '6px', 
+  fontWeight: 'bold',
+  wordBreak: 'break-all', 
+  marginBottom: '0.5px',
+  maxWidth: '35mm'
+}}>
+  {printingLabel.barcode}
+</div>
             <div style={{ fontSize: '8px', fontWeight: 'bold', marginBottom: '0.5px' }}>{printingLabel.name.substring(0, 18)}</div>
           </div>
         </div>,
