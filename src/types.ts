@@ -32,6 +32,7 @@ export interface Product {
   isPart?: boolean;            // true = pièce détachée, false = produit/accessoire
   isService?: boolean;         // true = service (main-d'œuvre) : pas de prix d'achat ni de stock
   lowStockAlert?: number;
+  characteristics?: string;    // Caractéristiques PC (CPU, RAM, SSD, etc.)
   ownerId?: string;
   createdAt?: string;
 }
@@ -181,6 +182,8 @@ export interface SaleItem {
   quantity: number;
   price: number;
   total: number;
+  reference?: string;        // Référence du produit (optionnel)
+  barcode?: string;          // Code à barre du produit (optionnel)
 }
 
 export interface Sale {
