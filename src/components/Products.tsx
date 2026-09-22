@@ -2068,81 +2068,34 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         </div>
       )}
 
-      {/* Étiquette autocollante code-barres (impression) — format 40 × 30 mm */}
+      {/* Étiquette autocollante code-barres (impression) — format 40 × 30 mm SIMPLE */}
       {printingLabel && createPortal(
         <div className="print-container">
           <style>{`
             @page {
               size: 40mm 30mm !important;
               margin: 0 !important;
-              padding: 0 !important;
             }
             @media print {
-              body, html {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 40mm !important;
-                height: 30mm !important;
-                background: white !important;
-              }
-              * {
-                margin: 0 !important;
-                padding: 0 !important;
-                border: none !important;
-              }
-              .print-container {
-                width: 40mm !important;
-                height: 30mm !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-              }
-              .barcode-label-print {
-                width: 40mm !important;
-                height: 30mm !important;
-                margin: 0 !important;
-                padding: 2px !important;
-                page-break-after: avoid !important;
-                page-break-inside: avoid !important;
-                page-break-before: avoid !important;
-                orphans: 1 !important;
-                widows: 1 !important;
-                break-after: avoid !important;
-                break-inside: avoid !important;
-                break-before: avoid !important;
-              }
-              .barcode-label-print svg {
-                max-width: 100% !important;
-                height: auto !important;
-                margin: 0 !important;
-                padding: 0 !important;
-              }
+              * { margin: 0 !important; padding: 0 !important; }
+              html, body { width: 40mm !important; height: 30mm !important; }
             }
           `}</style>
-          <div
-            className="barcode-label-print bg-white text-black font-sans"
-            style={{ 
-              width: '40mm', 
-              height: '30mm', 
-              margin: 0, 
-              padding: '2px',
-              textAlign: 'center', 
-              boxSizing: 'border-box', 
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '2px'
-            }}
-          >
-            <div style={{ fontWeight: 900, fontSize: '11px', letterSpacing: '0.3px', lineHeight: 1, flexShrink: 0 }}>SmarTECH</div>
-            <div style={{ fontSize: '8px', fontWeight: 700, lineHeight: 1.1, wordBreak: 'break-word', maxHeight: '6mm', overflow: 'hidden', flexShrink: 0 }}>{printingLabel.name || '—'}</div>
-            <div style={{ flexShrink: 0, maxWidth: '100%' }}>
-              <BarcodeLabel value={printingLabel.barcode} height={20} moduleWidth={1} />
-            </div>
+          <div style={{ 
+            width: '40mm', 
+            height: '30mm', 
+            margin: 0, 
+            padding: '2px',
+            boxSizing: 'border-box',
+            textAlign: 'center',
+            fontSize: '7.5px',
+            fontFamily: 'monospace',
+            overflow: 'hidden'
+          }}>
+            <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '1px' }}>SmarTech</div>
+            <div style={{ borderTop: '1px solid black', margin: '1px 0' }}></div>
+            <div style={{ fontSize: '7px', fontWeight: 'bold', wordBreak: 'break-all', marginBottom: '0.5px' }}>{printingLabel.barcode}</div>
+            <div style={{ fontSize: '8px', fontWeight: 'bold', marginBottom: '0.5px' }}>{printingLabel.name.substring(0, 18)}</div>
           </div>
         </div>,
         document.body
