@@ -50,20 +50,20 @@ export const PrintableTicket = forwardRef<HTMLDivElement, Props>(({ invoice, own
       backgroundColor: 'white',
       color: 'black',
       fontFamily: 'monospace',
-      fontSize: '6.5px',
+      fontSize: '7.5px',
       lineHeight: '1'
     }}>
-      <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '9px', marginBottom: '1px' }}>SmarTech</div>
-      <div style={{ textAlign: 'center', fontSize: '6px', marginBottom: '1px' }}>{dateStr}</div>
+      <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '10px', marginBottom: '1px' }}>SmarTech</div>
+      <div style={{ textAlign: 'center', fontSize: '7px', marginBottom: '1px' }}>{dateStr}</div>
       
       <div style={{ borderTop: '1px solid black', margin: '1px 0' }}></div>
       
       {invoice.items.slice(0, 1).map((item, i) => (
         <div key={i} style={{ overflow: 'hidden' }}>
-          {item.barcode && <div style={{ textAlign: 'center', fontSize: '6px', fontWeight: 'bold', marginBottom: '0.5px', wordBreak: 'break-all' }}>{item.barcode}</div>}
-          <div style={{ textAlign: 'center', fontSize: '7px', fontWeight: 'bold', marginBottom: '0.5px' }}>{item.name.substring(0, 18)}</div>
-          {item.reference && <div style={{ textAlign: 'center', fontSize: '6px', marginBottom: '0.5px' }}>Réf: {item.reference}</div>}
-          <div style={{ textAlign: 'center', fontSize: '7px', fontWeight: 'bold' }}>{item.total.toFixed(3)} {currency}</div>
+          {item.barcode && <div style={{ textAlign: 'center', fontSize: '7px', fontWeight: 'bold', marginBottom: '0.5px', wordBreak: 'break-all' }}>{item.barcode}</div>}
+          <div style={{ textAlign: 'center', fontSize: '8px', fontWeight: 'bold', marginBottom: '0.5px' }}>{item.name.substring(0, 18)}</div>
+          {item.reference && <div style={{ textAlign: 'center', fontSize: '7px', marginBottom: '0.5px' }}>Réf: {item.reference}</div>}
+          <div style={{ textAlign: 'center', fontSize: '8px', fontWeight: 'bold' }}>{item.total.toFixed(3)} {currency}</div>
         </div>
       ))}
     </div>
