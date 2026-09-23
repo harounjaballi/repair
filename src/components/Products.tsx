@@ -7,7 +7,7 @@ import { handleFirestoreError, OperationType } from '../App';
 import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp, Printer } from 'lucide-react';
 import { cn, decodeAzertyBarcode, isSparePart, isService } from '../lib/utils';
 import { Barcode as BarcodeLabel } from './Barcode';
-import { barcodeSvg } from '../lib/barcode';
+import { productBarcodeSvg } from '../lib/barcode';
 
 interface ProductsProps {
   userProfile: UserProfile | null;
@@ -2127,11 +2127,10 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
 
             {/* Code-barres Code128 (SVG local) + numéro, au centre de l'étiquette */}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              {/* Dimensions réelles en mm (module aligné sur les points de l'imprimante + zones blanches) */}
               <div
-                style={{ width: '34mm', height: '10mm' }}
                 dangerouslySetInnerHTML={{
-                  __html: barcodeSvg(printingLabel.barcode, { height: 40, moduleWidth: 1, margin: 0 })
-                    .replace(/width="[^"]*" height="[^"]*"/, 'width="100%" height="100%" preserveAspectRatio="none"')
+                  __html: productBarcodeSvg(printingLabel.barcode, { heightMm: 10, maxWidthMm: 38 })
                 }}
               />
               <div style={{ fontSize: '6px', fontWeight: 'bold', lineHeight: '1', marginTop: '0.3mm', wordBreak: 'break-all', maxWidth: '36mm' }}>
