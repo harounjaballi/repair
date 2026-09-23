@@ -323,7 +323,11 @@ export default function POS({ userProfile }: POSProps) {
         quantity: 1,
         price: product.sellPrice,
         total: product.sellPrice,
-        buyPrice: product.buyPrice || 0 // Figé au moment de la vente
+        buyPrice: product.buyPrice || 0, // Figé au moment de la vente
+        // Référence et code-barres copiés pour l'étiquette imprimée
+        // (ajoutés seulement s'ils existent : Firestore refuse les valeurs undefined)
+        ...(product.reference ? { reference: product.reference } : {}),
+        ...(product.barcode ? { barcode: product.barcode } : {})
       }, ...prev];
     });
     setSelectedCartItemId(product.id);
