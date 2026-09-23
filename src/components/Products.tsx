@@ -188,6 +188,70 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     };
   }, [isModalOpen]);
 
+  // Recherche par douchette dans la liste des Articles (hors formulaire) :
+  // une rafale de frappes à vitesse machine est interprétée comme un scan et
+  // remplit la recherche (catégorie remise sur « Toutes » pour ne rien masquer).
+  useEffect(() => {
+    if (isPartMode || isModalOpen || showSecurityModal) return;
+
+    let buffer = '';
+    let lastKeyTime = 0;
+    let burstFast = true;
+    let commitTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const commitScan = (): boolean => {
+      if (commitTimer) { clearTimeout(commitTimer); commitTimer = undefined; }
+      const code = decodeAzertyBarcode(buffer.trim());
+      const wasFast = burstFast;
+      buffer = '';
+      lastKeyTime = 0;
+      burstFast = true;
+      if (!wasFast || code.length < 3) return false;
+      playBeep('success');
+      setSearchTerm(code);
+      setSelectedCategory('all');
+      return true;
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      const target = e.target as HTMLElement;
+      const isSearchInput = target && target.tagName === 'INPUT' && (target as HTMLInputElement).name === 'product-search';
+      const isOtherField = target && !isSearchInput && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT');
+      if (isOtherField) return;
+
+      const now = Date.now();
+      const interval = lastKeyTime ? now - lastKeyTime : 0;
+      lastKeyTime = now;
+
+      if (e.key.length === 1) {
+        if (commitTimer) { clearTimeout(commitTimer); commitTimer = undefined; }
+        if (interval > 120) {
+          buffer = e.key;
+          burstFast = true;
+        } else {
+          buffer += e.key;
+          if (interval > 80) burstFast = false;
+        }
+        // Douchette sans suffixe Entrée : rafale rapide ≥ 6 caractères + courte pause
+        if (burstFast && buffer.length >= 6) {
+          commitTimer = setTimeout(() => { commitScan(); }, 300);
+        }
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        if (buffer.length >= 3 && commitScan()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+      if (commitTimer) clearTimeout(commitTimer);
+    };
+  }, [isPartMode, isModalOpen, showSecurityModal]);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -977,7 +1041,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                 type="text"
                 name="product-search"
                 autoComplete="off"
-                placeholder={isPartMode ? 'Rechercher une pièce...' : 'Rechercher un article...'}
+                placeholder={isPartMode ? 'Rechercher une pièce...' : 'Rechercher un article ou scanner un code-barres...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white text-xs font-semibold text-slate-700 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all duration-300"
