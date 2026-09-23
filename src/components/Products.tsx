@@ -1271,7 +1271,11 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         <button
                           type="button"
                           onClick={() => {
-                            const randomCode = '619' + Math.floor(1000000000 + Math.random() * 9000000000).toString();
+                            // EAN-13 valide : 619 + 9 chiffres aléatoires + clé de contrôle calculée
+                            // (sans clé correcte, la douchette refuse de lire le code imprimé).
+                            const base = '619' + Math.floor(100000000 + Math.random() * 900000000).toString();
+                            const sum = base.split('').reduce((acc, ch, i) => acc + Number(ch) * (i % 2 === 0 ? 1 : 3), 0);
+                            const randomCode = base + ((10 - (sum % 10)) % 10).toString();
                             setFormData({ ...formData, barcode: randomCode });
                             playBeep('success');
                           }}
