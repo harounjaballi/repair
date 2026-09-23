@@ -4,7 +4,7 @@ import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, order
 import { db } from '../firebase';
 import { Product, Category, Brand, StoreSettings, UserProfile, PcSpecs } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
-import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp, Printer } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp, Printer, Laptop } from 'lucide-react';
 import { cn, decodeAzertyBarcode, isSparePart, isService } from '../lib/utils';
 import { Barcode as BarcodeLabel } from './Barcode';
 import { productBarcodeSvg } from '../lib/barcode';
@@ -313,6 +313,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
   // Fenêtre « Fiche PC » (brouillon modifié tant que la fenêtre est ouverte)
   const [isPcSpecsOpen, setIsPcSpecsOpen] = useState(false);
   const [pcDraft, setPcDraft] = useState<PcSpecs>(EMPTY_PC_SPECS);
+  // Fenêtre d'affichage (lecture seule) des informations d'un PC de la liste
+  const [pcInfoProduct, setPcInfoProduct] = useState<Product | null>(null);
 
   const [buyPriceInput, setBuyPriceInput] = useState('');
   const [sellPriceInput, setSellPriceInput] = useState('');
@@ -1248,6 +1250,16 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>+ Stock</span>
+                        </button>
+                        )}
+
+                        {!isPartMode && product.category.toUpperCase().includes('PC') && (
+                        <button
+                          onClick={() => setPcInfoProduct(product)}
+                          className="p-2 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors border border-transparent"
+                          title="Informations du PC"
+                        >
+                          <Laptop className="w-4 h-4" />
                         </button>
                         )}
 
@@ -2219,6 +2231,79 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
           </div>
         </div>
       )}
+
+      {/* Fenêtre « Informations du PC » (lecture seule, depuis la liste des articles) */}
+      {pcInfoProduct && (() => {
+        const sp = pcInfoProduct.pcSpecs;
+        const storage = sp
+          ? [sp.ssd ? `SSD${sp.ssdSize ? ' ' + sp.ssdSize : ''}` : '', sp.hdd ? `HDD${sp.hddSize ? ' ' + sp.hddSize : ''}` : ''].filter(Boolean).join(' + ')
+          : '';
+        const rows: [string, string][] = sp ? [
+          ['Processeur', sp.cpu],
+          ['Génération', sp.generation],
+          ['Stockage', storage],
+          ['RAM', sp.ram],
+          ['Type RAM', sp.ramType],
+          ['État batterie', sp.battery]
+        ] : [];
+        const currency = storeSettings?.currency || 'DT';
+        return (
+          <div
+            className="fixed inset-0 z-[75] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
+            onClick={() => setPcInfoProduct(null)}
+          >
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[95vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-slate-800 truncate">💻 {pcInfoProduct.name}</h3>
+                  <p className="text-xs text-slate-400">
+                    {[pcInfoProduct.brand, pcInfoProduct.reference && `Réf: ${pcInfoProduct.reference}`, pcInfoProduct.barcode].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+                <button type="button" onClick={() => setPcInfoProduct(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {sp ? (
+                  <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
+                    {rows.map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                        <span className="text-slate-500 font-medium">{label}</span>
+                        <span className={cn('font-semibold text-right', value ? 'text-slate-800' : 'text-slate-300')}>{value || '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : pcInfoProduct.characteristics ? (
+                  <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-sm text-slate-700">
+                    {pcInfoProduct.characteristics}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic text-center py-4">Aucune caractéristique renseignée pour ce PC.</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Prix de vente</p>
+                    <p className="font-bold text-slate-800">{(pcInfoProduct.sellPrice || 0).toFixed(3)} {currency}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Stock</p>
+                    <p className="font-bold text-slate-800">{pcInfoProduct.stock}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end px-6 py-4 border-t border-slate-100">
+                <button type="button" onClick={() => setPcInfoProduct(null)} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl cursor-pointer">
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Fenêtre « Fiche PC » : caractéristiques structurées d'un PC */}
       {isPcSpecsOpen && (() => {
