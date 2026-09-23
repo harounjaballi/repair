@@ -2137,18 +2137,18 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                   __html: productBarcodeSvg(printingLabel.barcode, { heightMm: 10, maxWidthMm: 38 })
                 }}
               />
-              <div style={{ fontSize: '6px', fontWeight: 'bold', lineHeight: '1', marginTop: '0.3mm', wordBreak: 'break-all', maxWidth: '36mm' }}>
+              <div style={{ fontSize: '8px', fontWeight: 'bold', lineHeight: '1', marginTop: '0.3mm', wordBreak: 'break-all', maxWidth: '36mm' }}>
                 {printingLabel.barcode}
               </div>
             </div>
 
             {/* En bas : nom du produit + référence */}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: '1mm' }}>
-              <div style={{ fontSize: '8px', fontWeight: 'bold', lineHeight: '1.1', maxWidth: '38mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: '1.1', maxWidth: '38mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                 {printingLabel.name.substring(0, 22)}
               </div>
               {printingLabel.reference && (
-                <div style={{ fontSize: '7px', lineHeight: '1.1', maxWidth: '38mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                <div style={{ fontSize: '9px', lineHeight: '1.1', maxWidth: '38mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                   Réf: {printingLabel.reference}
                 </div>
               )}
