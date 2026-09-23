@@ -211,10 +211,10 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
   // Impression d'une étiquette autocollante avec le code-barres du produit :
   // ligne 1 = SmarTECH, ligne 2 = nom du produit, ligne 3 = code-barres.
   // Utilise le même mécanisme .print-container (portal) que les tickets.
-  const [printingLabel, setPrintingLabel] = useState<{ name: string; barcode: string } | null>(null);
+  const [printingLabel, setPrintingLabel] = useState<{ name: string; barcode: string; reference?: string } | null>(null);
   const printBarcodeLabel = () => {
     if (!formData.barcode) return;
-    setPrintingLabel({ name: formData.name, barcode: formData.barcode });
+    setPrintingLabel({ name: formData.name, barcode: formData.barcode, reference: formData.reference || '' });
     setTimeout(() => {
       try {
         // Désactiver les marges et les entêtes/pieds de page
@@ -2106,39 +2106,50 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
               html, body { width: 40mm !important; height: 30mm !important; }
             }
           `}</style>
+          {/* Mise en page : en-tête en haut, code-barres centré, nom + référence en bas.
+              Centrage par flex (les marges « auto » sont annulées par la règle print * { margin: 0 }). */}
           <div style={{ 
             width: '40mm', 
             height: '30mm', 
-            margin: 0, 
-            padding: '2px',
             boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             textAlign: 'center',
-            fontSize: '7.5px',
             fontFamily: 'monospace',
             overflow: 'hidden'
           }}>
-            <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '1px' }}>SmarTech</div>
-            <div style={{ borderTop: '1px solid black', margin: '1px 0' }}></div>
-            {/* Code-barres Code128 réel, généré localement en SVG */}
-            <div
-              style={{ width: '36mm', height: '10mm', margin: '0 auto 0.5px auto' }}
-              dangerouslySetInnerHTML={{
-                __html: barcodeSvg(printingLabel.barcode, { height: 40, moduleWidth: 1, margin: 0 })
-                  .replace(/width="[^"]*" height="[^"]*"/, 'width="100%" height="100%" preserveAspectRatio="none"')
-              }}
-            />
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '1mm' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '10px', lineHeight: '1' }}>SmarTech</div>
+              <div style={{ borderTop: '1px solid black', width: '36mm', marginTop: '0.5mm' }}></div>
+            </div>
 
-{/* NUMÉRO DU CODE-BARRES */}
-<div style={{ 
-  fontSize: '6px', 
-  fontWeight: 'bold',
-  wordBreak: 'break-all', 
-  marginBottom: '0.5px',
-  maxWidth: '35mm'
-}}>
-  {printingLabel.barcode}
-</div>
-            <div style={{ fontSize: '8px', fontWeight: 'bold', marginBottom: '0.5px' }}>{printingLabel.name.substring(0, 18)}</div>
+            {/* Code-barres Code128 (SVG local) + numéro, au centre de l'étiquette */}
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div
+                style={{ width: '34mm', height: '10mm' }}
+                dangerouslySetInnerHTML={{
+                  __html: barcodeSvg(printingLabel.barcode, { height: 40, moduleWidth: 1, margin: 0 })
+                    .replace(/width="[^"]*" height="[^"]*"/, 'width="100%" height="100%" preserveAspectRatio="none"')
+                }}
+              />
+              <div style={{ fontSize: '6px', fontWeight: 'bold', lineHeight: '1', marginTop: '0.3mm', wordBreak: 'break-all', maxWidth: '36mm' }}>
+                {printingLabel.barcode}
+              </div>
+            </div>
+
+            {/* En bas : nom du produit + référence */}
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: '1mm' }}>
+              <div style={{ fontSize: '8px', fontWeight: 'bold', lineHeight: '1.1', maxWidth: '38mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                {printingLabel.name.substring(0, 22)}
+              </div>
+              {printingLabel.reference && (
+                <div style={{ fontSize: '7px', lineHeight: '1.1', maxWidth: '38mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                  Réf: {printingLabel.reference}
+                </div>
+              )}
+            </div>
           </div>
         </div>,
         document.body
