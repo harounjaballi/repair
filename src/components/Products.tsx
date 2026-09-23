@@ -2,12 +2,53 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy, setDoc, getDocs, where, getDocFromServer } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Product, Category, Brand, StoreSettings, UserProfile } from '../types';
+import { Product, Category, Brand, StoreSettings, UserProfile, PcSpecs } from '../types';
 import { handleFirestoreError, OperationType } from '../App';
 import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp, Printer } from 'lucide-react';
 import { cn, decodeAzertyBarcode, isSparePart, isService } from '../lib/utils';
 import { Barcode as BarcodeLabel } from './Barcode';
 import { productBarcodeSvg } from '../lib/barcode';
+
+// ---- Fiche PC : listes de choix ----
+const PC_CPUS = [
+  'Intel Core i3', 'Intel Core i5', 'Intel Core i7', 'Intel Core i9',
+  'Intel Core Ultra 5', 'Intel Core Ultra 7', 'Intel Core Ultra 9',
+  'Intel Celeron', 'Intel Pentium', 'Intel Core 2 Duo',
+  'AMD Ryzen 3', 'AMD Ryzen 5', 'AMD Ryzen 7', 'AMD Ryzen 9', 'AMD Athlon', 'AMD A-Series',
+  'Apple M1', 'Apple M2', 'Apple M3', 'Apple M4', 'Autre'
+];
+const PC_GENERATIONS: Record<'intel' | 'ultra' | 'amd', string[]> = {
+  intel: ['2e génération', '3e génération', '4e génération', '5e génération', '6e génération', '7e génération', '8e génération', '9e génération', '10e génération', '11e génération', '12e génération', '13e génération', '14e génération'],
+  ultra: ['Série 1', 'Série 2'],
+  amd: ['Série 2000', 'Série 3000', 'Série 4000', 'Série 5000', 'Série 6000', 'Série 7000', 'Série 8000', 'Série AI 300']
+};
+const PC_STORAGE_SIZES = ['64 Go', '128 Go', '240 Go', '256 Go', '480 Go', '500 Go', '512 Go', '1 To', '2 To'];
+const PC_RAM_SIZES = ['2 Go', '4 Go', '6 Go', '8 Go', '12 Go', '16 Go', '24 Go', '32 Go', '64 Go'];
+const PC_RAM_TYPES = ['DDR2', 'DDR3', 'DDR3L', 'DDR4', 'DDR5', 'LPDDR3', 'LPDDR4X', 'LPDDR5', 'Mémoire unifiée'];
+const PC_BATTERY_STATES = ['Excellent (90–100 %)', 'Bon (80–89 %)', 'Moyen (60–79 %)', 'Faible (< 60 %)', 'À remplacer', 'Sans batterie'];
+
+const EMPTY_PC_SPECS: PcSpecs = { cpu: '', generation: '', ssd: false, ssdSize: '', hdd: false, hddSize: '', ram: '', ramType: '', battery: '' };
+
+// Générations proposées selon le processeur choisi (aucune pour Apple / Autre)
+const pcGenerationsFor = (cpu: string): string[] => {
+  if (cpu.startsWith('Intel Core Ultra')) return PC_GENERATIONS.ultra;
+  if (cpu.startsWith('Intel')) return PC_GENERATIONS.intel;
+  if (cpu.startsWith('AMD')) return PC_GENERATIONS.amd;
+  return [];
+};
+
+// Texte résumé enregistré dans « characteristics » (affiché dans la liste, la caisse, etc.)
+const pcSpecsToText = (sp: PcSpecs): string => {
+  const parts: string[] = [];
+  if (sp.cpu) parts.push(sp.generation ? `${sp.cpu} ${sp.generation}` : sp.cpu);
+  if (sp.ram) parts.push(`RAM ${sp.ram}${sp.ramType ? ' ' + sp.ramType : ''}`);
+  const storage: string[] = [];
+  if (sp.ssd) storage.push(`SSD${sp.ssdSize ? ' ' + sp.ssdSize : ''}`);
+  if (sp.hdd) storage.push(`HDD${sp.hddSize ? ' ' + sp.hddSize : ''}`);
+  if (storage.length) parts.push(storage.join(' + '));
+  if (sp.battery) parts.push(`Batterie : ${sp.battery}`);
+  return parts.join(' · ');
+};
 
 interface ProductsProps {
   userProfile: UserProfile | null;
@@ -265,8 +306,13 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     reference: '',
     compatibleModels: '',
     lowStockAlert: 0,
-    characteristics: ''
+    characteristics: '',
+    pcSpecs: undefined as PcSpecs | undefined
   });
+
+  // Fenêtre « Fiche PC » (brouillon modifié tant que la fenêtre est ouverte)
+  const [isPcSpecsOpen, setIsPcSpecsOpen] = useState(false);
+  const [pcDraft, setPcDraft] = useState<PcSpecs>(EMPTY_PC_SPECS);
 
   const [buyPriceInput, setBuyPriceInput] = useState('');
   const [sellPriceInput, setSellPriceInput] = useState('');
@@ -382,6 +428,12 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // Champs à enregistrer, lus au moment de l'envoi (après les ajustements ci-dessous) ;
+    // pcSpecs n'est envoyé que s'il existe (Firestore refuse les valeurs undefined).
+    const buildPayload = () => {
+      const { pcSpecs, ...rest } = formData;
+      return { ...rest, ...(pcSpecs ? { pcSpecs } : {}) };
+    };
     e.preventDefault();
     setErrorMsg(null);
 
@@ -457,7 +509,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         }
 
         await updateDoc(doc(db, 'products', editingProduct.id), {
-          ...formData,
+          ...buildPayload(),
           isPart: isServiceForm ? false : isPartMode,
           isService: isServiceForm,
           ownerId,
@@ -482,7 +534,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         }
       } else {
         const docRef = await addDoc(collection(db, 'products'), {
-          ...formData,
+          ...buildPayload(),
           isPart: isServiceForm ? false : isPartMode,
           isService: isServiceForm,
           createdAt: new Date().toISOString(),
@@ -779,7 +831,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         reference: product.reference || '',
         compatibleModels: product.compatibleModels || '',
         lowStockAlert: product.lowStockAlert ?? 0,
-        characteristics: product.characteristics || ''
+        characteristics: product.characteristics || '',
+        pcSpecs: product.pcSpecs
       });
       setBuyPriceInput(product.buyPrice.toFixed(3));
       setSellPriceInput(product.sellPrice.toFixed(3));
@@ -799,7 +852,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         reference: '',
         compatibleModels: '',
         lowStockAlert: 0,
-        characteristics: ''
+        characteristics: '',
+        pcSpecs: undefined
       });
       setBuyPriceInput('');
       setSellPriceInput('');
@@ -1409,19 +1463,24 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                     </div>
                   </div>
 
-                  {/* Zone Caractéristiques PC - Affichée si catégorie contient "PC" */}
+                  {/* Caractéristiques PC - fiche structurée dans une fenêtre séparée (catégorie contenant « PC ») */}
                   {formData.category.toUpperCase().includes('PC') && (
                     <div className="col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         💻 Caractéristiques du PC
                       </label>
-                      <textarea
-                        value={formData.characteristics || ''}
-                        onChange={(e) => setFormData({ ...formData, characteristics: e.target.value })}
-                        placeholder="Ex: Intel i7, 16GB RAM, SSD 512GB, RTX 3060, Win 11..."
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-slate-800 bg-white resize-none h-20"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Listez les spécifications principales du PC</p>
+                      <div className="flex items-center gap-3 px-4 py-2.5 border border-gray-200 rounded-xl bg-slate-50">
+                        <p className={cn('flex-1 text-sm', formData.characteristics ? 'text-slate-800' : 'text-slate-400 italic')}>
+                          {formData.characteristics || 'Aucune caractéristique renseignée'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => { setPcDraft({ ...EMPTY_PC_SPECS, ...(formData.pcSpecs || {}) }); setIsPcSpecsOpen(true); }}
+                          className="shrink-0 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+                        >
+                          {formData.characteristics ? 'Modifier la fiche' : 'Remplir la fiche PC'}
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -2160,6 +2219,132 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
           </div>
         </div>
       )}
+
+      {/* Fenêtre « Fiche PC » : caractéristiques structurées d'un PC */}
+      {isPcSpecsOpen && (() => {
+        const selectCls = 'w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm text-slate-800 bg-white';
+        const labelCls = 'block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1';
+        const generations = pcGenerationsFor(pcDraft.cpu);
+        const preview = pcSpecsToText(pcDraft);
+        return (
+          <div className="fixed inset-0 z-[75] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[95vh] flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <h3 className="text-lg font-bold text-slate-800">💻 Fiche PC</h3>
+                <button type="button" onClick={() => setIsPcSpecsOpen(false)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Processeur</label>
+                    <select
+                      value={pcDraft.cpu}
+                      onChange={(e) => {
+                        const cpu = e.target.value;
+                        // Réinitialise la génération si elle n'existe pas pour ce processeur
+                        setPcDraft(d => ({ ...d, cpu, generation: pcGenerationsFor(cpu).includes(d.generation) ? d.generation : '' }));
+                      }}
+                      className={selectCls}
+                    >
+                      <option value="">— Choisir —</option>
+                      {PC_CPUS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Génération</label>
+                    <select
+                      value={pcDraft.generation}
+                      onChange={(e) => setPcDraft(d => ({ ...d, generation: e.target.value }))}
+                      disabled={generations.length === 0}
+                      className={cn(selectCls, generations.length === 0 && 'bg-slate-100 text-slate-400')}
+                    >
+                      <option value="">{generations.length === 0 ? '—' : '— Choisir —'}</option>
+                      {generations.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Stockage</label>
+                  <div className="space-y-2">
+                    {([['ssd', 'ssdSize', 'SSD'], ['hdd', 'hddSize', 'HDD']] as const).map(([flag, size, label]) => (
+                      <div key={flag} className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 w-20 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={pcDraft[flag]}
+                            onChange={(e) => setPcDraft(d => ({ ...d, [flag]: e.target.checked, ...(e.target.checked ? {} : { [size]: '' }) }))}
+                            className="w-4 h-4 accent-indigo-600"
+                          />
+                          <span className="text-sm font-semibold text-slate-700">{label}</span>
+                        </label>
+                        <select
+                          value={pcDraft[size]}
+                          onChange={(e) => setPcDraft(d => ({ ...d, [size]: e.target.value }))}
+                          disabled={!pcDraft[flag]}
+                          className={cn(selectCls, 'flex-1', !pcDraft[flag] && 'bg-slate-100 text-slate-400')}
+                        >
+                          <option value="">Capacité {label}</option>
+                          {PC_STORAGE_SIZES.map(sz => <option key={sz} value={sz}>{sz}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>RAM</label>
+                    <select value={pcDraft.ram} onChange={(e) => setPcDraft(d => ({ ...d, ram: e.target.value }))} className={selectCls}>
+                      <option value="">— Choisir —</option>
+                      {PC_RAM_SIZES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Type RAM</label>
+                    <select value={pcDraft.ramType} onChange={(e) => setPcDraft(d => ({ ...d, ramType: e.target.value }))} className={selectCls}>
+                      <option value="">— Choisir —</option>
+                      {PC_RAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelCls}>État batterie</label>
+                  <select value={pcDraft.battery} onChange={(e) => setPcDraft(d => ({ ...d, battery: e.target.value }))} className={selectCls}>
+                    <option value="">— Choisir —</option>
+                    {PC_BATTERY_STATES.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Aperçu</p>
+                  <p className="text-sm text-slate-700">{preview || '—'}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100">
+                <button type="button" onClick={() => setIsPcSpecsOpen(false)} className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, pcSpecs: { ...pcDraft }, characteristics: pcSpecsToText(pcDraft) }));
+                    setIsPcSpecsOpen(false);
+                  }}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl cursor-pointer"
+                >
+                  Valider
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Étiquette autocollante code-barres (impression) — format 50 × 30 mm */}
       {printingLabel && createPortal(
