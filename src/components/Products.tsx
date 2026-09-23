@@ -224,7 +224,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
           style.media = 'print';
           style.innerHTML = `
             @page {
-              size: 40mm 30mm;
+              size: 50mm 30mm;
               margin: 0;
             }
             body {
@@ -2097,23 +2097,23 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
         </div>
       )}
 
-      {/* Étiquette autocollante code-barres (impression) — format 40 × 30 mm SIMPLE */}
+      {/* Étiquette autocollante code-barres (impression) — format 50 × 30 mm */}
       {printingLabel && createPortal(
         <div className="print-container">
           <style>{`
             @page {
-              size: 40mm 30mm !important;
+              size: 50mm 30mm !important;
               margin: 0 !important;
             }
             @media print {
               * { margin: 0 !important; padding: 0 !important; }
-              html, body { width: 40mm !important; height: 30mm !important; }
+              html, body { width: 50mm !important; height: 30mm !important; }
             }
           `}</style>
           {/* Mise en page : en-tête en haut, code-barres centré, nom + référence en bas.
               Centrage par flex (les marges « auto » sont annulées par la règle print * { margin: 0 }). */}
           <div style={{ 
-            width: '40mm', 
+            width: '50mm', 
             height: '30mm', 
             boxSizing: 'border-box',
             display: 'flex',
@@ -2125,8 +2125,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
             overflow: 'hidden'
           }}>
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '1mm' }}>
-              <div style={{ fontWeight: 'bold', fontSize: '10px', lineHeight: '1' }}>SmarTech</div>
-              <div style={{ borderTop: '1px solid black', width: '36mm', marginTop: '0.5mm' }}></div>
+              <div style={{ fontWeight: 'bold', fontSize: '13px', lineHeight: '1' }}>SmarTech</div>
+              <div style={{ borderTop: '1px solid black', width: '46mm', marginTop: '0.5mm' }}></div>
             </div>
 
             {/* Code-barres Code128 (SVG local) + numéro, au centre de l'étiquette */}
@@ -2134,21 +2134,21 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
               {/* Dimensions réelles en mm (module aligné sur les points de l'imprimante + zones blanches) */}
               <div
                 dangerouslySetInnerHTML={{
-                  __html: productBarcodeSvg(printingLabel.barcode, { heightMm: 10, maxWidthMm: 38 })
+                  __html: productBarcodeSvg(printingLabel.barcode, { heightMm: 11, maxWidthMm: 46 })
                 }}
               />
-              <div style={{ fontSize: '8px', fontWeight: 'bold', lineHeight: '1', marginTop: '0.3mm', wordBreak: 'break-all', maxWidth: '36mm' }}>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: '1', marginTop: '0.3mm', wordBreak: 'break-all', maxWidth: '46mm' }}>
                 {printingLabel.barcode}
               </div>
             </div>
 
             {/* En bas : nom du produit + référence */}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: '1mm' }}>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: '1.1', maxWidth: '38mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                {printingLabel.name.substring(0, 22)}
+              <div style={{ fontSize: '12px', fontWeight: 'bold', lineHeight: '1.1', maxWidth: '48mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                {printingLabel.name.substring(0, 24)}
               </div>
               {printingLabel.reference && (
-                <div style={{ fontSize: '9px', lineHeight: '1.1', maxWidth: '38mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                <div style={{ fontSize: '11px', lineHeight: '1.1', maxWidth: '48mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                   Réf: {printingLabel.reference}
                 </div>
               )}
