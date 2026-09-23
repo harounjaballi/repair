@@ -10,7 +10,7 @@ export interface Category {
 }
 
 // Marque d'une pièce détachée (ex: Samsung, Apple, Xiaomi...)
-export interface Brand {
+export interface Brand {a
   id: string;
   name: string;
   ownerId?: string;
@@ -33,6 +33,7 @@ export interface Product {
   isService?: boolean;         // true = service (main-d'œuvre) : pas de prix d'achat ni de stock
   lowStockAlert?: number;
   characteristics?: string;    // Caractéristiques PC (CPU, RAM, SSD, etc.)
+  pcSpecs?: PcSpecs;           // Fiche PC structurée (source du texte « characteristics »)
   ownerId?: string;
   createdAt?: string;
 }
@@ -257,4 +258,17 @@ export interface Note {
   createdAt: any;
   userId: string;
   ownerId?: string;
+}
+
+// Fiche technique d'un PC (catégorie PC) — saisie dans la fenêtre « Fiche PC »
+export interface PcSpecs {
+  cpu: string;          // ex. « Intel Core i7 »
+  generation: string;   // ex. « 12e génération », « Série 5000 »
+  ssd: boolean;
+  ssdSize: string;      // ex. « 512 Go »
+  hdd: boolean;
+  hddSize: string;      // ex. « 1 To »
+  ram: string;          // ex. « 16 Go »
+  ramType: string;      // ex. « DDR4 »
+  battery: string;      // ex. « Bon (80–89 %) »
 }
