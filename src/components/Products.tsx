@@ -7,6 +7,7 @@ import { handleFirestoreError, OperationType } from '../App';
 import { Plus, Search, Edit2, Trash2, X, AlertTriangle, Package, Tag, Barcode, Shield, Eye, EyeOff, AlertCircle, History, Loader2, ArrowDown, ArrowUp, Printer } from 'lucide-react';
 import { cn, decodeAzertyBarcode, isSparePart, isService } from '../lib/utils';
 import { Barcode as BarcodeLabel } from './Barcode';
+import { barcodeSvg } from '../lib/barcode';
 
 interface ProductsProps {
   userProfile: UserProfile | null;
@@ -1090,10 +1091,15 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
           <div style={{ width: '40mm', height: '30mm', margin: 0, padding: '2px', boxSizing: 'border-box', textAlign: 'center', fontSize: '7.5px', fontFamily: 'monospace', overflow: 'hidden' }}>
             <div style={{ fontWeight: 'bold', fontSize: '10px', marginBottom: '1px' }}>SmarTech</div>
             <div style={{ borderTop: '1px solid black', margin: '1px 0' }}></div>
-            <div style={{ fontSize: '6px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '0.5px', lineHeight: '1.2' }}>
-              {'*'.repeat(printingLabel.barcode.length)}
-            </div>
-            <div style={{ fontSize: '6px', fontWeight: 'bold', wordBreak: 'break-all', marginBottom: '0.5px', maxWidth: '35mm' }}>
+            {/* Code-barres Code128 réel, généré localement en SVG */}
+            <div
+              style={{ width: '36mm', height: '10mm', margin: '0 auto 0.5px auto' }}
+              dangerouslySetInnerHTML={{
+                __html: barcodeSvg(printingLabel.barcode, { height: 40, moduleWidth: 1, margin: 0 })
+                  .replace(/width="[^"]*" height="[^"]*"/, 'width="100%" height="100%" preserveAspectRatio="none"')
+              }}
+            />
+            <div style={{ fontSize: '6px', fontWeight: 'bold', wordBreak: 'break-all', margin: '0 auto 0.5px auto', maxWidth: '35mm' }}>
               {printingLabel.barcode}
             </div>
             <div style={{ fontSize: '8px', fontWeight: 'bold', marginBottom: '0.5px' }}>{printingLabel.name.substring(0, 18)}</div>
