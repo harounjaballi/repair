@@ -2125,7 +2125,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
             overflow: 'hidden'
           }}>
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '1mm' }}>
-              <div style={{ fontWeight: 'bold', fontSize: '13px', lineHeight: '1' }}>SmarTech</div>
+              <div style={{ fontWeight: 'bold', fontSize: '16px', lineHeight: '1' }}>SmarTech</div>
               <div style={{ borderTop: '1px solid black', width: '46mm', marginTop: '0.5mm' }}></div>
             </div>
 
@@ -2134,21 +2134,21 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
               {/* Dimensions réelles en mm (module aligné sur les points de l'imprimante + zones blanches) */}
               <div
                 dangerouslySetInnerHTML={{
-                  __html: productBarcodeSvg(printingLabel.barcode, { heightMm: 11, maxWidthMm: 46 })
+                  __html: productBarcodeSvg(printingLabel.barcode, { heightMm: 13, maxWidthMm: 46 })
                 }}
               />
-              <div style={{ fontSize: '10px', fontWeight: 'bold', lineHeight: '1', marginTop: '0.3mm', wordBreak: 'break-all', maxWidth: '46mm' }}>
+              <div style={{ fontSize: '12px', fontWeight: 'bold', lineHeight: '1', marginTop: '0.3mm', wordBreak: 'break-all', maxWidth: '46mm' }}>
                 {printingLabel.barcode}
               </div>
             </div>
 
             {/* En bas : nom du produit + référence */}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: '1mm' }}>
-              <div style={{ fontSize: '12px', fontWeight: 'bold', lineHeight: '1.1', maxWidth: '48mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                {printingLabel.name.substring(0, 24)}
+              <div style={{ fontSize: '15px', fontWeight: 'bold', lineHeight: '1.05', maxWidth: '49mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                {printingLabel.name.substring(0, 20)}
               </div>
               {printingLabel.reference && (
-                <div style={{ fontSize: '11px', lineHeight: '1.1', maxWidth: '48mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                <div style={{ fontSize: '13px', fontWeight: 'bold', lineHeight: '1.05', maxWidth: '49mm', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                   Réf: {printingLabel.reference}
                 </div>
               )}
