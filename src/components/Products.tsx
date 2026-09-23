@@ -25,7 +25,8 @@ const PC_GENERATIONS: Record<'intel' | 'ultra' | 'amd', string[]> = {
 const PC_STORAGE_SIZES = ['64 Go', '128 Go', '240 Go', '256 Go', '480 Go', '500 Go', '512 Go', '1 To', '2 To'];
 const PC_RAM_SIZES = ['2 Go', '4 Go', '6 Go', '8 Go', '12 Go', '16 Go', '24 Go', '32 Go', '64 Go'];
 const PC_RAM_TYPES = ['DDR2', 'DDR3', 'DDR3L', 'DDR4', 'DDR5', 'LPDDR3', 'LPDDR4X', 'LPDDR5', 'Mémoire unifiée'];
-const PC_BATTERY_STATES = ['Excellent (90–100 %)', 'Bon (80–89 %)', 'Moyen (60–79 %)', 'Faible (< 60 %)', 'À remplacer', 'Sans batterie'];
+// État batterie exprimé en autonomie (heures)
+const PC_BATTERY_STATES = ['Plus de 6 h', '5 à 6 h', '4 à 5 h', '3 à 4 h', '2 à 3 h', '1 à 2 h', "Moins d'1 h", 'À remplacer', 'Sans batterie'];
 
 const EMPTY_PC_SPECS: PcSpecs = { cpu: '', generation: '', ssd: false, ssdSize: '', hdd: false, hddSize: '', ram: '', ramType: '', battery: '' };
 
