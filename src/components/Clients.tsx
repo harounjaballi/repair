@@ -15,7 +15,10 @@ export default function Clients({ userProfile }: ClientsProps) {
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [onlyWithDebt, setOnlyWithDebt] = useState(true);
+  // Par défaut : uniquement les clients endettés au moins une fois (les clients cash sont masqués)
+  const [showAllClients, setShowAllClients] = useState(false);
+  // Clients ayant eu au moins une dette dans le journal client_debts
+  const [everIndebtedIds, setEverIndebtedIds] = useState<Set<string>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
@@ -52,6 +55,19 @@ export default function Clients({ userProfile }: ClientsProps) {
       handleFirestoreError(error, OperationType.LIST, 'clients');
     });
 
+    const unsubscribeDebts = onSnapshot(
+      query(collection(db, 'client_debts'), where('ownerId', '==', ownerId)),
+      (snapshot) => {
+        const ids = new Set<string>();
+        snapshot.docs.forEach(d => {
+          const e = d.data() as ClientDebtEntry;
+          if (e.clientId && (e.amount || 0) > 0.0005) ids.add(e.clientId);
+        });
+        setEverIndebtedIds(ids);
+      },
+      (error) => { handleFirestoreError(error, OperationType.LIST, 'client_debts'); }
+    );
+
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', ownerId), (snapshot) => {
       if (snapshot.exists()) {
         setStoreSettings(snapshot.data() as StoreSettings);
@@ -63,6 +79,7 @@ export default function Clients({ userProfile }: ClientsProps) {
     return () => {
       unsubscribe();
       unsubscribeSettings();
+      unsubscribeDebts();
     };
   }, [ownerId]);
 
@@ -259,10 +276,9 @@ export default function Clients({ userProfile }: ClientsProps) {
       c.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.phone?.includes(searchTerm);
     
-    if (onlyWithDebt) {
-      return matchesSearch && c.debt > 0;
-    }
-    return matchesSearch;
+    if (showAllClients) return matchesSearch;
+    // Endetté au moins une fois = dette actuelle OU au moins une dette dans le journal
+    return matchesSearch && ((c.debt || 0) > 0 || everIndebtedIds.has(c.id));
   });
 
   return (
@@ -295,21 +311,16 @@ export default function Clients({ userProfile }: ClientsProps) {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setOnlyWithDebt(!onlyWithDebt)}
+              onClick={() => setShowAllClients(!showAllClients)}
               className={cn(
                 "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 border cursor-pointer select-none",
-                onlyWithDebt 
+                showAllClients
                   ? "bg-rose-50 text-rose-700 border-rose-200 shadow-xs" 
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800"
               )}
             >
-              <Coins className={cn("w-4 h-4 transition-transform duration-300", onlyWithDebt ? "text-rose-500 scale-110" : "text-slate-400")} />
-              <span>Clients endettés uniquement</span>
-              {onlyWithDebt && (
-                <span className="ml-1.5 px-2 py-0.5 bg-rose-200 text-rose-800 text-xs font-black rounded-md">
-                  {clients.filter(c => c.debt > 0).length}
-                </span>
-              )}
+              <Coins className={cn("w-4 h-4 transition-transform duration-300", showAllClients ? "text-rose-500 scale-110" : "text-slate-400")} />
+              <span>{showAllClients ? 'Tous les clients affichés' : 'Afficher tous les clients'}</span>
             </button>
           </div>
         </div>
