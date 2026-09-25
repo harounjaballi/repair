@@ -753,43 +753,11 @@ export default function POS({ userProfile }: POSProps) {
         </div>
       )}
 
-      {/* En-tête de la caisse */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
-            <ShoppingCart className="w-5 h-5" />
-          </div>
-          <div className="leading-tight">
-            <h1 className="text-xl font-extrabold text-slate-900">Caisse</h1>
-            <p className="text-xs text-slate-500 font-medium">{format(new Date(), 'dd/MM/yyyy')}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 text-xs">
-          <button
-            type="button"
-            onClick={() => setScannerActive(!scannerActive)}
-            title="Activer / désactiver le lecteur code à barre"
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full font-bold border transition-colors cursor-pointer",
-              scannerActive
-                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                : "bg-slate-100 text-slate-500 border-slate-200"
-            )}
-          >
-            <span className={cn("w-2 h-2 rounded-full", scannerActive ? "bg-emerald-500 animate-pulse" : "bg-slate-400")} />
-            {scannerActive ? 'Scanner prêt' : 'Scanner inactif'}
-          </button>
-          {userProfile?.name && (
-            <span className="hidden sm:inline text-slate-500 font-medium">Caissier : {userProfile.name}</span>
-          )}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-1 gap-3 flex-1 min-h-0">
         {/* Gauche : catalogue des articles */}
         <div className="order-2 lg:order-1 lg:col-span-7 flex flex-col min-h-0 lg:h-full">
           {/* Barre de scan / recherche */}
-          <div className="flex items-center gap-3 bg-white border-2 border-emerald-500 rounded-2xl px-4 py-3 mb-3 shadow-sm">
+          <div className="flex items-center gap-3 bg-white border-2 border-emerald-500 rounded-2xl px-4 py-2.5 mb-2.5 shadow-sm">
             <Barcode className={cn("w-6 h-6 text-emerald-700 shrink-0", scannerActive && "animate-pulse")} />
             <input
               type="text"
@@ -804,6 +772,20 @@ export default function POS({ userProfile }: POSProps) {
                 <X className="w-4 h-4" />
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setScannerActive(!scannerActive)}
+              title="Activer / désactiver le lecteur code à barre"
+              className={cn(
+                "flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border transition-colors cursor-pointer shrink-0",
+                scannerActive
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  : "bg-slate-100 text-slate-500 border-slate-200"
+              )}
+            >
+              <span className={cn("w-2 h-2 rounded-full", scannerActive ? "bg-emerald-500 animate-pulse" : "bg-slate-400")} />
+              {scannerActive ? 'Scanner prêt' : 'Scanner inactif'}
+            </button>
           </div>
 
           {/* Catégories */}
