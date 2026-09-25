@@ -371,11 +371,20 @@ export default function Repairs({ userProfile }: RepairsProps) {
             <Wrench className="w-12 h-12 text-slate-200 mx-auto mb-3" />
             <p className="text-slate-400 font-semibold">Aucune réparation trouvée</p>
           </div>
-        ) : filtered.map(r => (
+        ) : filtered.map(r => {
+          // Réparation terminée/livrée ET entièrement payée (après remise) → ligne en vert
+          const isDoneAndPaid = (r.status === 'termine' || r.status === 'livre') &&
+            ((r.total || 0) - (r.discount || 0) - (r.paid || 0)) <= 0.001;
+          return (
           <div
             key={r.id}
             onClick={() => setDetailRepair(r)}
-            className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group"
+            className={cn(
+              "rounded-2xl border p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group",
+              isDoneAndPaid
+                ? "bg-emerald-50 border-emerald-300 hover:border-emerald-400"
+                : "bg-white border-slate-100 hover:border-indigo-100"
+            )}
           >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 transition-colors">
@@ -402,11 +411,23 @@ export default function Repairs({ userProfile }: RepairsProps) {
               <div className="text-right shrink-0">
                 <p className="font-black text-slate-900">{(r.total || 0).toFixed(2)} {currency}</p>
                 {r.debt > 0 && <p className="text-[11px] font-bold text-rose-500">Reste {r.debt.toFixed(2)}</p>}
-                <ChevronRight className="w-4 h-4 text-slate-300 ml-auto mt-1 group-hover:text-indigo-400 transition-colors" />
+                <div className="flex items-center justify-end gap-1 mt-1">
+                  {userProfile?.role === 'admin' && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(r); }}
+                      className="p-1.5 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-100 transition-colors"
+                      title="Supprimer la réparation"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-400 transition-colors" />
+                </div>
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Historique journalier des indicateurs */}
