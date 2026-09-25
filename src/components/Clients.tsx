@@ -15,7 +15,7 @@ export default function Clients({ userProfile }: ClientsProps) {
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [onlyWithDebt, setOnlyWithDebt] = useState(false);
+  const [onlyWithDebt, setOnlyWithDebt] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
