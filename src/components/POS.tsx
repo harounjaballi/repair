@@ -785,9 +785,9 @@ export default function POS({ userProfile }: POSProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-1 gap-3 flex-1 min-h-0">
         {/* Gauche : catalogue des articles */}
-        <div className="order-2 lg:order-1 lg:col-span-7 flex flex-col min-h-0">
+        <div className="order-2 lg:order-1 lg:col-span-7 flex flex-col min-h-0 lg:h-full">
           {/* Barre de scan / recherche */}
           <div className="flex items-center gap-3 bg-white border-2 border-emerald-500 rounded-2xl px-4 py-3 mb-3 shadow-sm">
             <Barcode className={cn("w-6 h-6 text-emerald-700 shrink-0", scannerActive && "animate-pulse")} />
@@ -900,8 +900,8 @@ export default function POS({ userProfile }: POSProps) {
         </div>
 
         {/* Droite : panier et encaissement */}
-        <div className="order-1 lg:order-2 lg:col-span-5 min-h-0">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col gap-3 h-full min-h-0">
+        <div className="order-1 lg:order-2 lg:col-span-5 min-h-0 lg:h-full">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
 
             {/* Client */}
             <div className="relative">
@@ -944,7 +944,7 @@ export default function POS({ userProfile }: POSProps) {
             </div>
 
             {/* Lignes du panier */}
-            <div className="flex-1 overflow-y-auto min-h-[120px] -mx-1 px-1 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto min-h-[80px] -mx-1 px-1 scrollbar-thin">
               {cart.length === 0 ? (
                 <div className="h-full py-10 flex flex-col items-center justify-center text-slate-400 gap-2 text-center">
                   <ShoppingCart className="w-10 h-10 opacity-30" />
@@ -1054,7 +1054,7 @@ export default function POS({ userProfile }: POSProps) {
             </div>
 
             {/* Sous-total et remise */}
-            <div className="border-t border-slate-100 pt-3 flex flex-col gap-2 text-sm">
+            <div className="border-t border-slate-100 pt-2 flex flex-col gap-1.5 text-sm shrink-0">
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 font-medium">Sous-total</span>
                 <span className="font-bold text-slate-800">{subtotal.toFixed(3)}</span>
@@ -1091,7 +1091,7 @@ export default function POS({ userProfile }: POSProps) {
             </div>
 
             {/* Total à payer */}
-            <div className="bg-emerald-50 rounded-xl px-4 py-3 flex items-center justify-between text-emerald-900">
+            <div className="bg-emerald-50 rounded-xl px-4 py-2 flex items-center justify-between text-emerald-900 shrink-0">
               <span className="font-bold text-sm">Total à payer</span>
               <span className="text-3xl font-extrabold tracking-tight select-all">
                 {cartTotal.toFixed(3)} <span className="text-sm font-bold">{currency}</span>
@@ -1099,7 +1099,7 @@ export default function POS({ userProfile }: POSProps) {
             </div>
 
             {/* Montant reçu + à rendre / reste */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 shrink-0">
               <label className="border border-slate-200 rounded-xl px-3 py-2 block focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15 transition-all">
                 <span className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
                   Montant reçu
@@ -1177,11 +1177,11 @@ export default function POS({ userProfile }: POSProps) {
             </div>
 
             {/* Actions principales */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <button
                 onClick={() => validateSale(false)}
                 disabled={cart.length === 0 || isProcessing}
-                className="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[15px] rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:scale-100 flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[15px] rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:scale-100 flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isProcessing ? 'Traitement...' : (
                   <>
@@ -1205,7 +1205,7 @@ export default function POS({ userProfile }: POSProps) {
                 }}
                 disabled={cart.length === 0 || isProcessing}
                 title="Enregistrer la vente en crédit (client requis)"
-                className="px-4 py-3.5 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 font-extrabold text-sm rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:scale-100 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="px-4 py-3 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 font-extrabold text-sm rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:scale-100 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <CreditCard className="w-4 h-4 shrink-0" />
                 Crédité
