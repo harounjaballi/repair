@@ -75,7 +75,7 @@ export default function Repairs({ userProfile }: RepairsProps) {
   const [settings, setSettings] = useState<StoreSettings | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | RepairStatus>('active');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | RepairStatus>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRepair, setEditingRepair] = useState<Repair | null>(null);
   const [detailRepair, setDetailRepair] = useState<Repair | null>(null);
