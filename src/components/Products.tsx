@@ -1152,12 +1152,12 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-100 text-slate-400 text-[10px] font-extrabold uppercase tracking-widest">
-                <th className="px-6 py-4">{isPartMode ? 'Pièce' : 'Article'}</th>
-                <th className="px-6 py-4">Catégorie</th>
-                <th className="px-6 py-4">Prix Achat</th>
-                <th className="px-6 py-4">Prix Vente</th>
-                <th className="px-6 py-4">Stock</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-3 py-3">{isPartMode ? 'Pièce' : 'Article'}</th>
+                <th className="px-3 py-3">Catégorie</th>
+                <th className="px-3 py-3">Prix Achat</th>
+                <th className="px-3 py-3">Prix Vente</th>
+                <th className="px-3 py-3">Stock</th>
+                <th className="px-3 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/70">
@@ -1177,7 +1177,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       ? "bg-red-50 hover:bg-red-100/70 border-l-4 border-red-500"
                       : "hover:bg-gray-50/50"
                   )}>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       <div className="font-medium text-gray-900">{product.name}</div>
                       <div className="flex flex-col gap-0.5">
                         {product.barcode && (
@@ -1197,7 +1197,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       <span className={cn(
                         "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize",
                         (() => {
@@ -1212,13 +1212,13 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                         {product.category}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 font-mono">{isService(product) ? '—' : `${product.buyPrice.toFixed(3)} ${storeSettings?.currency || 'DT'}`}</td>
-                    <td className="px-6 py-4 text-gray-900 font-bold font-mono">{product.sellPrice.toFixed(3)} {storeSettings?.currency || 'DT'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 text-gray-600 font-mono">{isService(product) ? '—' : `${product.buyPrice.toFixed(3)} ${storeSettings?.currency || 'DT'}`}</td>
+                    <td className="px-3 py-3 text-gray-900 font-bold font-mono">{product.sellPrice.toFixed(3)} {storeSettings?.currency || 'DT'}</td>
+                    <td className="px-3 py-3">
                       {isService(product) ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-150">Service</span>
                       ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className={cn(
                           "font-medium",
                           product.stock <= (product.lowStockAlert ?? 0) ? "text-red-600" : "text-gray-900",
@@ -1252,8 +1252,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-3 py-3 text-right">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
                         {!isService(product) && (
                         <button
                           onClick={() => {
@@ -1261,7 +1261,7 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                             setReplenishQty('');
                             setReplenishPrice(product.buyPrice.toFixed(3));
                           }}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-all text-xs font-black uppercase tracking-wider cursor-pointer border border-emerald-150"
+                          className="inline-flex items-center gap-1 px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-all text-xs font-black uppercase tracking-wider cursor-pointer border border-emerald-150"
                           title="Approvisionner (ajouter du stock) pour ce produit"
                         >
                           <Plus className="w-3.5 h-3.5" />
