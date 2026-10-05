@@ -1176,7 +1176,12 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       <div className="flex flex-col gap-0.5">
                         {product.barcode && (
                           <div className="text-[10px] font-mono text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded w-fit">
-                            Ref: {product.barcode}
+                            Code: {product.barcode}
+                          </div>
+                        )}
+                        {product.reference && (
+                          <div className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded w-fit">
+                            Réf: {product.reference}
                           </div>
                         )}
                         {product.characteristics && (
