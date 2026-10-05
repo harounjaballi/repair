@@ -1064,7 +1064,8 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.barcode && p.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
+      (p.barcode && p.barcode.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (p.reference && p.reference.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory =
       selectedCategory === 'all' || normalizeCat(p.category) === normalizeCat(selectedCategory);
     return matchesMode && matchesSearch && matchesCategory;
