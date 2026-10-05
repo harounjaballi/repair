@@ -1171,7 +1171,12 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                 </tr>
               ) : (
                 filteredProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={product.id} className={cn(
+                    "transition-colors",
+                    !isService(product) && (product.stock || 0) <= 0
+                      ? "bg-red-50 hover:bg-red-100/70 border-l-4 border-red-500"
+                      : "hover:bg-gray-50/50"
+                  )}>
                     <td className="px-6 py-4">
                       <div className="font-medium text-gray-900">{product.name}</div>
                       <div className="flex flex-col gap-0.5">
@@ -1216,10 +1221,14 @@ export default function Products({ userProfile, mode = 'product' }: ProductsProp
                       <div className="flex items-center gap-2">
                         <span className={cn(
                           "font-medium",
-                          product.stock <= (product.lowStockAlert ?? 0) ? "text-red-600" : "text-gray-900"
+                          product.stock <= (product.lowStockAlert ?? 0) ? "text-red-600" : "text-gray-900",
+                          (product.stock || 0) <= 0 && "font-black"
                         )}>
                           {product.stock}
                         </span>
+                        {(product.stock || 0) <= 0 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-black uppercase tracking-wider border border-red-200">Épuisé</span>
+                        )}
                         {product.stock <= (product.lowStockAlert ?? 0) && (
                           <AlertTriangle className="w-4 h-4 text-red-500" />
                         )}
