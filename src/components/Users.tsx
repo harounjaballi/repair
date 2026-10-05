@@ -36,6 +36,7 @@ const MENU_OPTIONS = [
   { id: 'clients', name: 'Gestion des Clients', description: 'Liste des clients et suivi des dettes' },
   { id: 'sales', name: 'Historique des Ventes', description: 'Suivi et recherche des ventes' },
   { id: 'invoices', name: 'Facturation', description: 'Édition et gestion des factures' },
+  { id: 'expenses', name: 'Dépenses', description: 'Saisie des sorties de caisse (achats, charges, dépenses)' },
   { id: 'notes', name: 'Mémos & Notes', description: 'Ajouter et planifier des mémos' },
   { id: 'settings', name: 'Paramètres du Magasin', description: 'Configurations de base' },
   { id: 'users', name: 'Gestion des Utilisateurs', description: 'Accès restreint pour gérer l\'équipe' },
