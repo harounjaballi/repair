@@ -582,7 +582,7 @@ export function RepairForm({
   const [diagnostic, setDiagnostic] = useState(repair?.diagnostic || '');
   const [technician, setTechnician] = useState(repair?.technician || '');
   const [status, setStatus] = useState<RepairStatus>(repair?.status || 'recu');
-  const [estimatedCost, setEstimatedCost] = useState(repair?.estimatedCost?.toString() || '');
+  const [estimatedCost] = useState(repair?.estimatedCost?.toString() || '');
   const [laborCost, setLaborCost] = useState(repair?.laborCost?.toString() || '');
   const [parts, setParts] = useState<RepairPart[]>(repair?.parts || []);
   const [paid, setPaid] = useState(repair?.paid?.toString() || '');
@@ -975,13 +975,14 @@ export function RepairForm({
 
           {/* Coûts */}
           <section className="grid grid-cols-2 gap-3 bg-slate-50 rounded-2xl p-4">
-            <Field label="Devis estimé" value={estimatedCost} onChange={setEstimatedCost} type="number" placeholder="0" />
-            <Field label="Main d'œuvre" value={laborCost} onChange={setLaborCost} type="number" placeholder="0" />
-            <div className="col-span-2 flex items-center justify-between text-sm border-t border-slate-200 pt-3">
-              <span className="text-slate-500 font-semibold">Total pièces</span>
-              <span className="font-black text-slate-700">{partsTotal.toFixed(2)} {currency}</span>
-            </div>
-            <div className="col-span-2 flex items-center justify-between">
+            <Field label="Main d'œuvre" value={laborCost} onChange={setLaborCost} type="number" placeholder="0" full />
+            {parts.length > 0 && (
+              <div className="col-span-2 flex items-center justify-between text-sm border-t border-slate-200 pt-3">
+                <span className="text-slate-500 font-semibold">Coût des pièces</span>
+                <span className="font-black text-slate-700">{partsTotal.toFixed(2)} {currency}</span>
+              </div>
+            )}
+            <div className="col-span-2 flex items-center justify-between border-t border-slate-200 pt-3">
               <span className="text-slate-800 font-black">TOTAL</span>
               <span className="font-black text-lg text-indigo-600">{total.toFixed(2)} {currency}</span>
             </div>
